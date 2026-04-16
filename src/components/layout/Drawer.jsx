@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import Icon from '../ui/Icon';
 import { db } from '../../db/database';
-import { cn } from '../../lib/utils';
 import FinanceSettingsSheet from '../ui/FinanceSettingsSheet';
 
 export default function Drawer({ isOpen, onClose }) {
@@ -37,7 +36,7 @@ export default function Drawer({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="font-headline font-bold text-on-surface">Anudeep</h2>
-              <p className="text-xs text-outline">Life OS Companion</p>
+              <p className="text-xs text-outline">LifeOS</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 text-outline hover:text-on-surface">

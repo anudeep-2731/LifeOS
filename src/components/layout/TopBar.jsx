@@ -19,7 +19,7 @@ export default function TopBar() {
           </button>
           <Link to="/dashboard">
             <h1 className="font-headline font-black text-primary text-xl tracking-tight hover:opacity-80 transition-opacity">
-              Serene Path
+              LifeOS
             </h1>
           </Link>
         </div>

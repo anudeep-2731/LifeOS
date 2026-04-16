@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Icon from '../components/ui/Icon';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, seedTodayData } from '../db/database';
@@ -13,22 +13,25 @@ const ENERGY_EMOJIS = [
 
 const QUICK_TAGS = ['Focused', 'Tired', 'Anxious', 'Flow', 'Motivated', 'Stressed'];
 
-const WEEKLY_BARS = [
-  { day: 'M', value: 3 },
-  { day: 'T', value: 4 },
-  { day: 'W', value: 2 },
-  { day: 'T', value: 5 },
-  { day: 'F', value: 4 },
-  { day: 'S', value: 3 },
-  { day: 'S', value: 4 },
-];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Return the past 7 days including today as YYYY-MM-DD strings, oldest first */
+const getLast7Days = () => {
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
+};
 
 export default function EnergyTab() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedLevel, setSelectedLevel] = useState(null);
   const [selectedTag, setSelectedTag] = useState(null);
-  const [screenTime, setScreenTime] = useState(4);
+  const [screenTime, setScreenTime] = useState(0);
+  const [weeklyBars, setWeeklyBars] = useState([]);
+  const saveTimerRef = useRef(null);
   const today = getTodayStr();
 
   const loadLogs = async () => {
@@ -37,15 +40,39 @@ export default function EnergyTab() {
     setLogs(data);
     setLoading(false);
 
-    // Seed selected level from latest log
     if (data.length > 0) {
-      setSelectedLevel(data[data.length - 1].level);
-      setSelectedTag(data[data.length - 1].tag || null);
+      const latest = data[data.length - 1];
+      setSelectedLevel(latest.level);
+      setSelectedTag(latest.tag || null);
+    }
+  };
+
+  const loadWeeklyBars = async () => {
+    const days = getLast7Days();
+    const bars = await Promise.all(days.map(async (dateStr) => {
+      const dayLogs = await db.energyLogs.where('date').equals(dateStr).toArray();
+      const avg = dayLogs.length
+        ? dayLogs.reduce((s, l) => s + l.level, 0) / dayLogs.length
+        : 0;
+      const d = new Date(dateStr + 'T00:00:00');
+      return { day: DAY_LABELS[d.getDay()].slice(0, 1), value: avg, isToday: dateStr === today };
+    }));
+    setWeeklyBars(bars);
+  };
+
+  const loadScreenTime = async () => {
+    const saved = await db.settings.get('screenTimeToday');
+    if (saved && saved.value.date === today) {
+      setScreenTime(saved.value.hours);
     }
   };
 
   useEffect(() => {
-    seedTodayData().then(loadLogs);
+    seedTodayData().then(() => {
+      loadLogs();
+      loadWeeklyBars();
+      loadScreenTime();
+    });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -54,16 +81,25 @@ export default function EnergyTab() {
     const tag = selectedTag || 'Neutral';
     await db.energyLogs.add({ date: today, time: new Date().toTimeString().slice(0, 5), level, tag, note: '' });
     loadLogs();
+    loadWeeklyBars();
   };
 
   const handleTagTap = (tag) => {
     setSelectedTag(prev => prev === tag ? null : tag);
   };
 
+  const handleScreenTimeChange = (val) => {
+    setScreenTime(val);
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      await db.settings.put({ key: 'screenTimeToday', value: { date: today, hours: val } });
+    }, 500);
+  };
+
   const latestLog = logs[logs.length - 1];
   const avgLevel  = logs.length ? Math.round(logs.reduce((s, l) => s + l.level, 0) / logs.length) : 0;
 
-  // SVG daily rhythm path — simple 3-point curve through logged levels
+  // SVG daily rhythm path — through logged levels
   const svgPoints = logs.slice(-3).map((l, i, arr) => {
     const x = arr.length === 1 ? 100 : (i / (arr.length - 1)) * 200;
     const y = 60 - (l.level / 5) * 50;
@@ -184,7 +220,7 @@ export default function EnergyTab() {
           </div>
         )}
 
-        {/* Screen time slider */}
+        {/* Screen time slider — persisted */}
         <div className="card-floating p-5">
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs font-bold uppercase tracking-widest text-outline-variant">Screen Time</p>
@@ -194,7 +230,7 @@ export default function EnergyTab() {
             type="range"
             min="0" max="12" step="0.5"
             value={screenTime}
-            onChange={e => setScreenTime(Number(e.target.value))}
+            onChange={e => handleScreenTimeChange(Number(e.target.value))}
             className="w-full accent-primary cursor-pointer"
           />
           <div className="flex justify-between text-[10px] text-outline mt-1">
@@ -203,26 +239,33 @@ export default function EnergyTab() {
             <span>12h</span>
           </div>
           <p className="text-xs text-outline mt-2">
-            {screenTime <= 2 ? 'Great digital balance today! 🌿' :
+            {screenTime <= 2 ? 'Great digital balance today!' :
              screenTime <= 5 ? 'Moderate screen usage — take a short break.' :
              'High screen time. Try stepping away for 10 minutes.'}
           </p>
         </div>
 
-        {/* Weekly trends */}
+        {/* Weekly trends — real data */}
         <div className="card-floating p-5">
           <p className="text-xs font-bold uppercase tracking-widest text-outline-variant mb-4">Weekly Trends</p>
-          <div className="flex items-end justify-between gap-1 h-20">
-            {WEEKLY_BARS.map(({ day, value }, i) => (
-              <div key={i} className="flex flex-col items-center gap-1 flex-1">
-                <div
-                  className="w-full rounded-t-lg bg-primary/70 transition-all"
-                  style={{ height: `${(value / 5) * 64}px` }}
-                />
-                <span className="text-[10px] text-outline">{day}</span>
-              </div>
-            ))}
-          </div>
+          {weeklyBars.length === 0 ? (
+            <p className="text-xs text-outline text-center py-4">Log energy to see your weekly pattern</p>
+          ) : (
+            <div className="flex items-end justify-between gap-1 h-20">
+              {weeklyBars.map(({ day, value, isToday }, i) => (
+                <div key={i} className="flex flex-col items-center gap-1 flex-1">
+                  <div
+                    className={cn(
+                      'w-full rounded-t-lg transition-all',
+                      isToday ? 'bg-primary' : value > 0 ? 'bg-primary/50' : 'bg-outline-variant/20'
+                    )}
+                    style={{ height: value > 0 ? `${(value / 5) * 64}px` : '4px' }}
+                  />
+                  <span className={cn('text-[10px]', isToday ? 'text-primary font-bold' : 'text-outline')}>{day}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
-import { db, getTodayStr, seedTodayData } from '../db/database';
+import { db, getTodayStr, seedTodayData, computeStreak } from '../db/database';
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -15,21 +15,26 @@ const dateStr = new Date().toLocaleDateString('en-US', {
   weekday: 'long', month: 'long', day: 'numeric',
 });
 
+const MEAL_ORDER = { Breakfast: 0, Lunch: 1, Dinner: 2, Snack: 3 };
+
 export default function DashboardTab() {
   const [stats, setStats] = useState({ routines: 0, routinesDone: 0, tasks: 0, tasksDone: 0, spent: 0, mealsAdherence: 0 });
   const [focusTask, setFocusTask] = useState(null);
-  const [streak] = useState(12);
-  const [energyLevel] = useState(4);
+  const [streak, setStreak] = useState(null);
+  const [energyLevel, setEnergyLevel] = useState(null);
+  const [nextMeal, setNextMeal] = useState(null);
   const navigate = useNavigate();
   const today = getTodayStr();
 
   useEffect(() => {
     seedTodayData().then(async () => {
-      const [routines, tasks, expenses, meals] = await Promise.all([
+      const [routines, tasks, expenses, meals, energyLogs, streakVal] = await Promise.all([
         db.routines.where('date').equals(today).toArray(),
         db.tasks.where('date').equals(today).toArray(),
         db.expenses.where('date').equals(today).toArray(),
         db.meals.where('date').equals(today).toArray(),
+        db.energyLogs.where('date').equals(today).toArray(),
+        computeStreak(),
       ]);
 
       const routinesDone = routines.filter(r => r.completed).length;
@@ -43,6 +48,19 @@ export default function DashboardTab() {
       const incomplete = tasks.filter(t => !t.completed);
       incomplete.sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
       setFocusTask(incomplete[0] || null);
+
+      setStreak(streakVal);
+
+      if (energyLogs.length > 0) {
+        const latest = energyLogs.sort((a, b) => a.time.localeCompare(b.time)).at(-1);
+        setEnergyLevel(latest.level);
+      } else {
+        setEnergyLevel(0);
+      }
+
+      const incompleteMeals = meals.filter(m => !m.completed);
+      incompleteMeals.sort((a, b) => (MEAL_ORDER[a.mealType] ?? 4) - (MEAL_ORDER[b.mealType] ?? 4));
+      setNextMeal(incompleteMeals[0] || null);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -71,7 +89,9 @@ export default function DashboardTab() {
             </span>
             <span className="text-xs font-semibold text-outline">Streak</span>
           </div>
-          <span className="text-3xl font-headline font-black text-on-surface">{streak}</span>
+          <span className="text-3xl font-headline font-black text-on-surface">
+            {streak === null ? '—' : streak}
+          </span>
           <span className="text-xs text-outline">days in a row</span>
         </div>
 
@@ -83,10 +103,12 @@ export default function DashboardTab() {
             </span>
             <span className="text-xs font-semibold text-outline">Energy</span>
           </div>
-          <span className="text-3xl font-headline font-black text-on-surface">{energyLevel}/5</span>
+          <span className="text-3xl font-headline font-black text-on-surface">
+            {energyLevel === null ? '—' : energyLevel === 0 ? '—' : `${energyLevel}/5`}
+          </span>
           <div className="flex gap-1">
             {[1,2,3,4,5].map(i => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= energyLevel ? 'bg-secondary' : 'bg-outline-variant/30'}`} />
+              <div key={i} className={`h-1.5 flex-1 rounded-full ${energyLevel && i <= energyLevel ? 'bg-secondary' : 'bg-outline-variant/30'}`} />
             ))}
           </div>
         </div>
@@ -166,8 +188,14 @@ export default function DashboardTab() {
             <Icon name="restaurant" size={16} className="text-tertiary" />
             <span className="text-xs font-semibold text-outline">Next Meal</span>
           </div>
-          <p className="text-sm font-semibold text-on-surface">Lunch</p>
-          <p className="text-xs text-outline mt-0.5">Quinoa Power Bowl</p>
+          {nextMeal ? (
+            <>
+              <p className="text-sm font-semibold text-on-surface">{nextMeal.mealType}</p>
+              <p className="text-xs text-outline mt-0.5 truncate">{nextMeal.title}</p>
+            </>
+          ) : (
+            <p className="text-sm text-outline">All meals done</p>
+          )}
         </div>
 
         <div className="card-floating p-4">
@@ -176,7 +204,7 @@ export default function DashboardTab() {
             <span className="text-xs font-semibold text-outline">Spent Today</span>
           </div>
           <p className="text-sm font-semibold text-on-surface">&#8377;{stats.spent.toLocaleString()}</p>
-          <p className="text-xs text-outline mt-0.5">of &#8377;30,000</p>
+          <p className="text-xs text-outline mt-0.5">of &#8377;30,000/mo</p>
         </div>
       </div>
     </div>
