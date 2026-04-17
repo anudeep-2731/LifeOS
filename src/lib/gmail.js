@@ -59,20 +59,19 @@ export async function authenticate() {
 }
 
 /**
- * Fetch recent threads that look like bank alerts
+ * Fetch recent messages that look like bank alerts for the current month.
  */
-export async function fetchBankEmails(days = 7) {
-  const dateLimit = new Date();
-  dateLimit.setDate(dateLimit.getDate() - days);
-  const after = dateLimit.toISOString().split('T')[0].replace(/-/g, '/');
+export async function fetchBankEmails(maxResults = 50) {
+  const now = new Date();
+  const monthStart = `${now.getFullYear()}/${String(now.getMonth() + 1).padStart(2, '0')}/01`;
 
-  // Search query for common banking keywords
-  const query = `after:${after} (debited OR "spent on" OR "transaction at" OR "alert" OR "statement")`;
+  // Search query for common banking keywords for the current month
+  const query = `after:${monthStart} (debited OR "spent on" OR "transaction" OR "debit alert" OR "statement")`;
   
   const response = await gapi.client.gmail.users.messages.list({
     'userId': 'me',
     'q': query,
-    'maxResults': 20
+    'maxResults': maxResults
   });
 
   const messages = response.result.messages || [];
@@ -81,20 +80,46 @@ export async function fetchBankEmails(days = 7) {
   for (const msg of messages) {
     const detail = await gapi.client.gmail.users.messages.get({
       'userId': 'me',
-      'id': msg.id
+      'id': msg.id,
+      'format': 'full'
     });
     
-    // Extract snippet and subject
     const payload = detail.result.payload;
-    const headers = payload.headers;
+    const headers = payload?.headers || [];
     const subject = headers.find(h => h.name === 'Subject')?.value || '';
-    const body = detail.result.snippet || '';
+    const snippet = detail.result.snippet || '';
+    const internalDateMs = Number(detail.result.internalDate);
     
+    // Format date from email's internalDate (epoch ms)
+    const idate = new Date(internalDateMs);
+    const internalDate = `${idate.getFullYear()}-${String(idate.getMonth() + 1).padStart(2, '0')}-${String(idate.getDate()).padStart(2, '0')}`;
+
+    // Try to extract plain text body for richer parsing
+    let fullBody = snippet;
+    try {
+      const getBody = (part) => {
+        if (!part) return '';
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          return atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+        }
+        if (part.parts) {
+          for (const p of part.parts) {
+            const txt = getBody(p);
+            if (txt) return txt;
+          }
+        }
+        return '';
+      };
+      const decoded = getBody(payload);
+      if (decoded) fullBody = decoded.trim().substring(0, 500); // cap at 500 chars
+    } catch (_) { /* fallback to snippet */ }
+
     results.push({
       id: msg.id,
       subject,
-      snippet: body,
-      date: new Date(parseInt(detail.result.internalDate)).toLocaleString()
+      snippet,
+      fullBody,
+      internalDate,
     });
   }
 

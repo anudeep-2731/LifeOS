@@ -107,11 +107,11 @@ function InvestmentInput({ category, date, onSave, defaultValue = 0 }) {
   const [editing, setEditing] = useState(false);
 
   const save = async () => {
-    const existing = await db.investments.where({ date, category }).first();
+    const existing = await db.investments.where({ month: date, category }).first();
     if (existing) {
       await db.investments.update(existing.id, { amount: Number(val) });
     } else {
-      await db.investments.add({ date, category, amount: Number(val) });
+      await db.investments.add({ month: date, category, amount: Number(val) });
     }
     setEditing(false);
     onSave();
@@ -158,7 +158,8 @@ export default function MoneyTab() {
   const [investCats, setInvestCats] = useState([]);
   const [categoryBudgets, setCategoryBudgets] = useState({});
   const [selectedMonth, setSelectedMonth] = useState(getMonthStr());
-  const [selectedDate, setSelectedDate] = useState(getTodayStr());
+  const [nlInput, setNlInput] = useState('');
+  const [isNlProcessing, setIsNlProcessing] = useState(false);
 
   const today = getTodayStr();
 
@@ -175,16 +176,53 @@ export default function MoneyTab() {
     monthExpenses.sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
     setExpenses(monthExpenses);
 
-    const currentInvests = await db.investments.where('date').equals(selectedDate).toArray();
+    const currentInvests = await db.investments.where('month').equals(selectedMonth).toArray();
     setInvestments(currentInvests);
 
     setLoading(false);
   };
 
+  const handleQuickAdd = async (e) => {
+    if (e.key !== 'Enter' || !nlInput.trim()) return;
+    setIsNlProcessing(true);
+    
+    try {
+      // Import parser logic or use a simple regex for now
+      // Pattern 1: [amount] for [desc]
+      // Pattern 2: [desc] [amount]
+      let amount = null;
+      let description = '';
+      
+      const amtMatch = nlInput.match(/(\d+(?:\.\d+)?)/);
+      if (amtMatch) amount = Number(amtMatch[1]);
+      
+      description = nlInput.replace(/(\d+(?:\.\d+)?)/, '').replace(/\b(for|on|at|spent|paid)\b/gi, '').trim();
+      
+      if (amount && description) {
+        const now = new Date();
+        const timestamp = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+        
+        await db.expenses.add({
+          date: today,
+          timestamp,
+          amount,
+          description,
+          category: 'Other', // Could improve with a simple keyword map
+        });
+        setNlInput('');
+        loadData();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsNlProcessing(false);
+    }
+  };
+
   useEffect(() => {
     seedTodayData().then(loadData);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonth, selectedDate]);
+  }, [selectedMonth]);
 
   const handleDelete = async (expense) => {
     await db.expenses.delete(expense.id);
@@ -276,16 +314,13 @@ export default function MoneyTab() {
       {/* Investments Section */}
       <div className="mx-4 mt-6">
         <div className="flex items-center justify-between mb-3 px-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Daily Investments</span>
-          <input type="date"
-            className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-lg focus:outline-none"
-            value={selectedDate} onChange={e => setSelectedDate(e.target.value)} />
+          <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly Investments</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           {investCats.map(cat => {
             const existing = investments.find(inv => inv.category === cat);
             return (
-              <InvestmentInput key={cat} category={cat} date={selectedDate}
+              <InvestmentInput key={cat} category={cat} date={selectedMonth}
                 defaultValue={existing?.amount || 0} onSave={loadData} />
             );
           })}
@@ -336,6 +371,37 @@ export default function MoneyTab() {
 
       {/* Recent expenses */}
       <div className="flex-1 px-4 pt-6 pb-24">
+        <div className="flex items-center justify-between mb-3 px-1">
+          <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Quick Log</span>
+        </div>
+        
+        <div className="relative mb-6">
+          <input
+            type="text"
+            className="input-pill w-full pl-12 pr-4 py-4 text-sm bg-surface-container-low border-surface-container-highest focus:bg-surface-container overflow-hidden shadow-inner"
+            placeholder="e.g. 250 for lunch or spent 1200 on fuel"
+            value={nlInput}
+            onChange={e => setNlInput(e.target.value)}
+            onKeyDown={handleQuickAdd}
+            disabled={isNlProcessing}
+          />
+          <div className="absolute left-4 top-1/2 -translate-y-1/2">
+            <Icon 
+              name={isNlProcessing ? "sync" : "auto_awesome"} 
+              size={18} 
+              className={cn("text-primary", isNlProcessing && "animate-spin")} 
+            />
+          </div>
+          {nlInput && !isNlProcessing && (
+            <button 
+              onClick={() => handleQuickAdd({ key: 'Enter' })}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center active:scale-90 transition-all"
+            >
+              <Icon name="arrow_forward" size={16} />
+            </button>
+          )}
+        </div>
+
         <div className="flex items-center justify-between mb-3 px-1">
           <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Transactions</span>
           {!loading && <span className="text-xs text-outline">{expenses.length} items</span>}

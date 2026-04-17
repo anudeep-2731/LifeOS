@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
@@ -240,6 +240,8 @@ export default function MorningTab() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [streak, setStreak] = useState(null);
   const [wakeTime, setWakeTime] = useState('07:00');
+  const [energyLevel, setEnergyLevel] = useState(7);
+  const [hasSavedEnergy, setHasSavedEnergy] = useState(false);
   const today = getTodayStr();
 
   const loadRoutines = async () => {
@@ -264,10 +266,18 @@ export default function MorningTab() {
     if (saved) setWakeTime(saved.value);
   };
 
+  const loadEnergy = async () => {
+    const log = await db.wellbeingLogs.where({ date: today, type: 'energy' }).first();
+    if (log) {
+      setEnergyLevel(log.value);
+      setHasSavedEnergy(true);
+    }
+  };
+
   useEffect(() => {
     seedTodayData().then(async () => {
       await rolloverHabitTemplates(today);
-      await Promise.all([loadRoutines(), loadTemplates(), loadStreak(), loadWakeTime()]);
+      await Promise.all([loadRoutines(), loadTemplates(), loadStreak(), loadWakeTime(), loadEnergy()]);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -297,6 +307,38 @@ export default function MorningTab() {
     setWakeTime(val);
     await db.settings.put({ key: 'wakeTime', value: val });
   };
+
+  const handleEnergySave = async (val) => {
+    setEnergyLevel(val);
+    await db.wellbeingLogs.put({
+      date: today,
+      type: 'energy',
+      value: val,
+      timestamp: new Date().toISOString(),
+    });
+    setHasSavedEnergy(true);
+  };
+
+  const energyAdvice = useMemo(() => {
+    if (energyLevel >= 8) return {
+      title: 'Peak State',
+      advice: 'Your energy is high. Perfect time for deep work, complex problem solving, or a heavy workout.',
+      icon: 'bolt',
+      color: 'text-tertiary'
+    };
+    if (energyLevel >= 5) return {
+      title: 'Steady State',
+      advice: 'You have good momentum. Focus on consistent progress on your main projects and important meetings.',
+      icon: 'sync',
+      color: 'text-primary'
+    };
+    return {
+      title: 'Recovery State',
+      advice: 'Energy is low. Prioritize shallow work, admin tasks, and gentle movement. Don\'t forget to recharge.',
+      icon: 'battery_low',
+      color: 'text-error'
+    };
+  }, [energyLevel]);
 
   const completedCount = routines.filter(r => r.completed).length;
 

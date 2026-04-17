@@ -5,7 +5,6 @@ const NAV_ITEMS = [
   { to: '/morning',   icon: 'wb_sunny',     label: 'Morning'   },
   { to: '/nutrition', icon: 'nutrition',    label: 'Nutrition' },
   { to: '/tasks',     icon: 'check_circle', label: 'Tasks'     },
-  { to: '/energy',    icon: 'bolt',         label: 'Energy'    },
   { to: '/money',     icon: 'payments',     label: 'Money'     },
 ];
 

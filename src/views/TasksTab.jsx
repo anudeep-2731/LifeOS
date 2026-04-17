@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
@@ -23,7 +23,7 @@ const RECURRING_LABELS = {
   weekdays: 'Weekdays',
 };
 
-const EMPTY_FORM = { title: '', duration: 30, priority: 'medium', scheduledTime: '', recurring: 'none' };
+const EMPTY_FORM = { title: '', duration: 30, priority: 'medium', scheduledTime: '', recurring: 'none', dueDate: getTodayStr() };
 
 function TaskCard({ task, onToggle, onDelete, onPostpone, onEdit }) {
   return (
@@ -78,7 +78,17 @@ function TaskCard({ task, onToggle, onDelete, onPostpone, onEdit }) {
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
-          <button onClick={onEdit} className="text-outline-variant hover:text-primary transition-colors p-1" aria-label="Edit task">
+          {!task.completed && (
+            <button
+              onClick={() => onEdit(task, true)}
+              className="text-outline-variant hover:text-primary transition-colors p-1"
+              aria-label="Schedule to routine"
+              title="Schedule to routine"
+            >
+              <Icon name="event_repeat" size={18} />
+            </button>
+          )}
+          <button onClick={() => onEdit(task)} className="text-outline-variant hover:text-primary transition-colors p-1" aria-label="Edit task">
             <Icon name="edit" size={16} />
           </button>
           {!task.completed && onPostpone && (
@@ -110,10 +120,12 @@ function TaskForm({ onSave, onClose, initialData, editId }) {
         priority: form.priority,
         scheduledTime: form.scheduledTime,
         recurring: form.recurring,
+        dueDate: form.dueDate,
       });
     } else {
       await db.tasks.add({
         date: today,
+        dueDate: form.dueDate || today,
         title: form.title.trim(),
         duration: Number(form.duration),
         priority: form.priority,
@@ -129,20 +141,12 @@ function TaskForm({ onSave, onClose, initialData, editId }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Title */}
       <div>
         <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Task Name</label>
-        <input
-          className="input-pill w-full text-sm"
-          placeholder="e.g. Deep work session"
-          value={form.title}
-          onChange={e => set('title', e.target.value)}
-          required
-          autoFocus
-        />
+        <input className="input-pill w-full text-sm" placeholder="e.g. Deep work session"
+          value={form.title} onChange={e => set('title', e.target.value)} required autoFocus />
       </div>
 
-      {/* Duration + Time */}
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Duration (min)</label>
@@ -156,34 +160,32 @@ function TaskForm({ onSave, onClose, initialData, editId }) {
         </div>
       </div>
 
-      {/* Priority */}
+      <div>
+        <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Due Date</label>
+        <input type="date" className="input-pill w-full text-sm"
+          value={form.dueDate} onChange={e => set('dueDate', e.target.value)} />
+      </div>
+
       <div>
         <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Priority</label>
         <div className="flex gap-2">
           {['high', 'medium', 'low'].map(p => (
             <button key={p} type="button" onClick={() => set('priority', p)}
               className={cn('flex-1 py-2.5 rounded-full text-sm font-semibold capitalize transition-all active:scale-95',
-                form.priority === p
-                  ? p === 'high'   ? 'bg-error text-white'
-                  : p === 'medium' ? 'bg-tertiary text-white'
-                  :                  'bg-surface-container-highest text-on-surface'
-                  : 'bg-surface-container text-outline hover:bg-surface-container-high')}>
+                form.priority === p ? (p === 'high' ? 'bg-error text-white' : p === 'medium' ? 'bg-tertiary text-white' : 'bg-surface-container-highest text-on-surface') : 'bg-surface-container text-outline hover:bg-surface-container-high')}>
               {p}
             </button>
           ))}
         </div>
       </div>
 
-      {/* Recurring */}
       <div>
         <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Repeat</label>
         <div className="flex gap-2">
           {Object.entries(RECURRING_LABELS).map(([val, label]) => (
             <button key={val} type="button" onClick={() => set('recurring', val)}
               className={cn('flex-1 py-2.5 rounded-full text-xs font-semibold transition-all active:scale-95',
-                form.recurring === val
-                  ? 'bg-primary text-white'
-                  : 'bg-surface-container text-outline hover:bg-surface-container-high')}>
+                form.recurring === val ? 'bg-primary text-white' : 'bg-surface-container text-outline hover:bg-surface-container-high')}>
               {label}
             </button>
           ))}
@@ -199,18 +201,29 @@ function TaskForm({ onSave, onClose, initialData, editId }) {
 
 export default function TasksTab() {
   const [tasks, setTasks] = useState([]);
+  const [carriedForward, setCarriedForward] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editTask, setEditTask] = useState(null);
+  const [showScheduleSheet, setShowScheduleSheet] = useState(false);
+  const [taskToSchedule, setTaskToSchedule] = useState(null);
+  const [scheduleTime, setScheduleTime] = useState('09:00');
   const today = getTodayStr();
 
   const loadTasks = async () => {
-    const data = await db.tasks.where('date').equals(today).toArray();
-    data.sort((a, b) => {
+    setLoading(true);
+    const [todayTasks, cfTasks] = await Promise.all([
+      db.tasks.where('date').equals(today).toArray(),
+      db.tasks.where('completed').equals(0).and(t => t.dueDate && t.dueDate < today && t.date !== today).toArray()
+    ]);
+
+    const sortFn = (a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       return (a.scheduledTime || '').localeCompare(b.scheduledTime || '');
-    });
-    setTasks(data);
+    };
+
+    setTasks(todayTasks.sort(sortFn));
+    setCarriedForward(cfTasks.sort(sortFn));
     setLoading(false);
   };
 
@@ -227,58 +240,74 @@ export default function TasksTab() {
     loadTasks();
   };
 
-  const handlePostpone = async (task) => {
-    await db.tasks.update(task.id, { postponeCount: task.postponeCount + 1 });
-    loadTasks();
-  };
-
   const handleDelete = async (task) => {
     await db.tasks.delete(task.id);
     loadTasks();
   };
 
-  const incomplete = tasks.filter(t => !t.completed);
-  const done       = tasks.filter(t => t.completed);
-  const focusTask  = incomplete[0] || null;
-  const queued     = incomplete.slice(1);
+  const handlePostpone = async (task) => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    await db.tasks.update(task.id, { 
+      date: tomorrowStr,
+      dueDate: tomorrowStr,
+      postponeCount: (task.postponeCount || 0) + 1 
+    });
+    loadTasks();
+  };
+
+  const handleScheduleToRoutine = async () => {
+    if (!taskToSchedule) return;
+    await db.routines.add({
+      date: today,
+      title: taskToSchedule.title,
+      start: scheduleTime,
+      duration: taskToSchedule.duration,
+      type: 'morning',
+      completed: false,
+      taskId: taskToSchedule.id,
+    });
+    await db.tasks.update(taskToSchedule.id, { scheduledTime: scheduleTime });
+    setShowScheduleSheet(false);
+    setTaskToSchedule(null);
+    loadTasks();
+  };
+
+  const handleEdit = (task, scheduleDirectly = false) => {
+    if (scheduleDirectly) {
+      setTaskToSchedule(task);
+      setShowScheduleSheet(true);
+    } else {
+      setEditTask(task);
+    }
+  };
+
+  const incompleteToday = tasks.filter(t => !t.completed);
+  const doneToday       = tasks.filter(t => t.completed);
+  const focusTask       = incompleteToday[0] || carriedForward[0] || null;
+  const queuedToday     = incompleteToday.slice(focusTask === incompleteToday[0] ? 1 : 0);
 
   return (
     <div className="flex flex-col min-h-screen">
-
-      {/* Header */}
       <div className="pt-6 px-6 pb-6 bg-surface-container-low">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-semibold text-outline uppercase tracking-wider mb-1">Productivity</p>
             <h1 className="text-2xl font-headline font-bold text-on-surface">Tasks</h1>
           </div>
-          <button
-            onClick={() => setShowForm(true)}
-            className="primary-gradient text-white text-xs font-bold rounded-full px-4 py-2 shadow-gradient active:scale-95 transition-all flex items-center gap-1.5"
-          >
-            <Icon name="add" size={14} className="text-white" />
-            Add Task
+          <button onClick={() => setShowForm(true)}
+            className="primary-gradient text-white text-xs font-bold rounded-full px-4 py-2 shadow-gradient active:scale-95 transition-all flex items-center gap-1.5">
+            <Icon name="add" size={14} /> Add Task
           </button>
-        </div>
-        <div className="flex gap-2 mt-3">
-          <span className="bg-primary text-white text-xs font-semibold rounded-full px-3 py-1">Today</span>
         </div>
       </div>
 
-      {/* Do It Now gradient card */}
       {!loading && focusTask && (
         <div className="mx-4 mt-4 primary-gradient rounded-2xl p-6 text-white shadow-gradient">
           <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-2">Do It Now</p>
           <h3 className="text-xl font-headline font-bold mb-1">{focusTask.title}</h3>
-          <div className="flex items-center gap-2 text-sm text-white/70 mb-4 flex-wrap">
-            <span>{focusTask.duration}m &bull; {focusTask.priority} priority</span>
-            {focusTask.recurring && focusTask.recurring !== 'none' && (
-              <span className="flex items-center gap-1 bg-white/20 rounded-full px-2 py-0.5 text-[11px] font-bold">
-                <Icon name="repeat" size={10} className="text-white" />
-                {RECURRING_LABELS[focusTask.recurring]}
-              </span>
-            )}
-          </div>
+          <p className="text-sm text-white/70 mb-4">{focusTask.duration}m &bull; {focusTask.priority} priority</p>
           <button onClick={() => handleToggle(focusTask)}
             className="bg-white/20 hover:bg-white/30 active:scale-95 transition-all text-white text-sm font-semibold rounded-full px-5 py-2">
             Mark Done
@@ -286,81 +315,94 @@ export default function TasksTab() {
         </div>
       )}
 
-      {/* Progress bento */}
       <div className="mx-4 mt-4 flex gap-3">
         <div className="flex-1 bg-secondary-container/30 rounded-2xl p-4">
           <Icon name="check_circle" size={20} filled className="text-secondary mb-2" />
-          <p className="text-2xl font-headline font-bold text-on-surface">{done.length}</p>
+          <p className="text-2xl font-headline font-bold text-on-surface">{doneToday.length}</p>
           <p className="text-xs text-outline">completed</p>
         </div>
         <div className="flex-1 bg-primary/5 rounded-2xl p-4">
           <Icon name="pending" size={20} className="text-primary mb-2" />
-          <p className="text-2xl font-headline font-bold text-on-surface">{incomplete.length}</p>
+          <p className="text-2xl font-headline font-bold text-on-surface">{incompleteToday.length + carriedForward.length}</p>
           <p className="text-xs text-outline">remaining</p>
         </div>
       </div>
 
-      {/* Task list */}
-      <div className="flex-1 px-4 pt-4 pb-4 space-y-6">
-        {loading && <p className="text-center text-outline text-sm pt-8">Loading...</p>}
-
-        {!loading && queued.length > 0 && (
+      <div className="flex-1 px-4 pt-4 pb-24 space-y-6">
+        {loading && <p className="text-center text-outline text-sm pt-8 animate-pulse">Loading...</p>}
+        {!loading && carriedForward.length > 0 && (
           <section>
-            <p className="text-xs font-bold uppercase tracking-widest text-outline-variant mb-3 px-1">Queued</p>
+            <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-3 px-1 flex items-center gap-2">
+              <Icon name="history" size={14} /> Brought Forward
+            </p>
             <div className="space-y-3">
-              {queued.map(t => (
-                <TaskCard key={t.id} task={t}
-                  onToggle={() => handleToggle(t)}
-                  onPostpone={() => handlePostpone(t)}
-                  onDelete={() => handleDelete(t)}
-                  onEdit={() => setEditTask(t)}
-                />
+              {carriedForward.map(t => (
+                <TaskCard key={t.id} task={t} onToggle={() => handleToggle(t)} onPostpone={() => handlePostpone(t)} onDelete={() => handleDelete(t)} onEdit={handleEdit} />
               ))}
             </div>
           </section>
         )}
-
-        {!loading && done.length > 0 && (
+        {!loading && (focusTask || queuedToday.length > 0) && (
+          <section>
+            <p className="text-xs font-bold uppercase tracking-widest text-outline-variant mb-3 px-1">Today's Queue</p>
+            <div className="space-y-3">
+              {focusTask && focusTask.date === today && (
+                <TaskCard task={focusTask} onToggle={() => handleToggle(focusTask)} onPostpone={() => handlePostpone(focusTask)} onDelete={() => handleDelete(focusTask)} onEdit={handleEdit} />
+              )}
+              {queuedToday.map(t => (
+                <TaskCard key={t.id} task={t} onToggle={() => handleToggle(t)} onPostpone={() => handlePostpone(t)} onDelete={() => handleDelete(t)} onEdit={handleEdit} />
+              ))}
+            </div>
+          </section>
+        )}
+        {!loading && doneToday.length > 0 && (
           <section>
             <p className="text-xs font-bold uppercase tracking-widest text-outline-variant mb-3 px-1">Done</p>
             <div className="space-y-3">
-              {done.map(t => (
-                <TaskCard key={t.id} task={t}
-                  onToggle={() => handleToggle(t)}
-                  onDelete={() => handleDelete(t)}
-                  onEdit={() => setEditTask(t)}
-                />
+              {doneToday.map(t => (
+                <TaskCard key={t.id} task={t} onToggle={() => handleToggle(t)} onDelete={() => handleDelete(t)} onEdit={handleEdit} />
               ))}
             </div>
           </section>
         )}
-
-        {!loading && tasks.length === 0 && (
+        {!loading && tasks.length === 0 && carriedForward.length === 0 && (
           <div className="flex flex-col items-center justify-center pt-16 text-outline">
             <Icon name="check_circle" size={40} className="mb-3 opacity-30" />
             <p className="text-sm">No tasks yet.</p>
             <button onClick={() => setShowForm(true)} className="mt-4 text-primary text-sm font-semibold flex items-center gap-1">
-              <Icon name="add_circle" size={16} className="text-primary" /> Add your first task
+              <Icon name="add_circle" size={16} /> Add your first task
             </button>
           </div>
         )}
       </div>
 
-      {/* Add Task sheet */}
       <BottomSheet isOpen={showForm} onClose={() => setShowForm(false)} title="New Task">
         <TaskForm onSave={loadTasks} onClose={() => setShowForm(false)} />
       </BottomSheet>
 
-      {/* Edit Task sheet */}
       <BottomSheet isOpen={!!editTask} onClose={() => setEditTask(null)} title="Edit Task">
         {editTask && (
           <TaskForm
-            initialData={{ title: editTask.title, duration: editTask.duration, priority: editTask.priority, scheduledTime: editTask.scheduledTime || '', recurring: editTask.recurring || 'none' }}
-            editId={editTask.id}
-            onSave={loadTasks}
-            onClose={() => setEditTask(null)}
+            initialData={{ 
+              title: editTask.title, duration: editTask.duration, priority: editTask.priority, 
+              scheduledTime: editTask.scheduledTime || '', recurring: editTask.recurring || 'none',
+              dueDate: editTask.dueDate || editTask.date 
+            }}
+            editId={editTask.id} onSave={loadTasks} onClose={() => setEditTask(null)}
           />
         )}
+      </BottomSheet>
+
+      <BottomSheet isOpen={showScheduleSheet} onClose={() => setShowScheduleSheet(false)} title="Schedule to Routine">
+        <div className="space-y-4">
+          <p className="text-sm text-outline">
+            Pick a time to add <strong>{taskToSchedule?.title}</strong> to today's morning routine.
+          </p>
+          <input type="time" className="input-pill w-full text-sm" value={scheduleTime} onChange={e => setScheduleTime(e.target.value)} />
+          <button onClick={handleScheduleToRoutine} className="btn-primary w-full py-4 shadow-gradient font-bold">
+            Confirm Schedule
+          </button>
+        </div>
       </BottomSheet>
     </div>
   );

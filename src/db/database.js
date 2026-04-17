@@ -53,16 +53,41 @@ db.version(5).stores({
   groceryItems: '++id, weekStart, name, checked',
 });
 
-// Version 6: nutrition board — categories, logs, weekly schedule
-db.version(6).stores({
+// Version 7: Task carry-forward (dueDate), Routine-Task linking (taskId), Investment monthly keying (month)
+db.version(7).stores({
   wellbeingLogs: '++id, date, type, timestamp, value, note',
-  tasks: '++id, date, title, duration, priority, postponeCount, completed, scheduledTime, recurring',
+  tasks: '++id, date, dueDate, title, duration, priority, postponeCount, completed, scheduledTime, recurring',
   expenses: '++id, date, timestamp, amount, category, description',
-  routines: '++id, date, title, start, duration, type, completed',
+  routines: '++id, date, title, start, duration, type, completed, taskId',
   meals: '++id, date, day, mealType, title, completed, calories',
   energyLogs: '++id, date, time, level, tag, note',
   settings: 'key',
-  investments: '++id, date, category, amount, note',
+  investments: '++id, month, category, amount, note',
+  habitTemplates: '++id, title, startTime, duration, type, active',
+  groceryItems: '++id, weekStart, name, checked',
+  nutritionCategories: '++id, name, frequency, userFrequency, priority, colorKey, order, active',
+  nutritionLogs: '++id, date, categoryId',
+  weeklySchedule: '++id, weekStart, categoryId',
+}).upgrade(async tx => {
+  // Migrate investments from date (YYYY-MM-DD) to month (YYYY-MM)
+  return tx.table('investments').toCollection().modify(inv => {
+    if (inv.date && !inv.month) {
+      inv.month = inv.date.slice(0, 7);
+      delete inv.date;
+    }
+  });
+});
+
+// Version 8: Add emailBody field to expenses for Gmail import validation
+db.version(8).stores({
+  wellbeingLogs: '++id, date, type, timestamp, value, note',
+  tasks: '++id, date, dueDate, title, duration, priority, postponeCount, completed, scheduledTime, recurring',
+  expenses: '++id, date, timestamp, amount, category, description, emailBody',
+  routines: '++id, date, title, start, duration, type, completed, taskId',
+  meals: '++id, date, day, mealType, title, completed, calories',
+  energyLogs: '++id, date, time, level, tag, note',
+  settings: 'key',
+  investments: '++id, month, category, amount, note',
   habitTemplates: '++id, title, startTime, duration, type, active',
   groceryItems: '++id, weekStart, name, checked',
   nutritionCategories: '++id, name, frequency, userFrequency, priority, colorKey, order, active',
@@ -144,7 +169,21 @@ export const rolloverHabitTemplates = async (today) => {
   }
 };
 
-// ─── Recurring task rollover ──────────────────────────────────────────────────
+// ─── Recurring & Carry-Forward Rollover ───────────────────────────────────────
+
+/**
+ * Tasks with an overdue dueDate that aren't completed are "carried forward" to today.
+ * They aren't duplicated, just identified as pending for the current view.
+ */
+export const rolloverIncompleteTasks = async (today) => {
+  // This helper finds all incomplete tasks with dueDate < today
+  const overdue = await db.tasks
+    .where('completed').equals(0)
+    .and(t => t.dueDate && t.dueDate < today)
+    .toArray();
+  
+  return overdue;
+};
 
 /**
  * For each recurring task from the last 7 days, ensure a copy exists for today.
@@ -191,6 +230,7 @@ export const rolloverRecurringTasks = async (today) => {
 
     await db.tasks.add({
       date: today,
+      dueDate: today,
       title: t.title,
       duration: t.duration,
       priority: t.priority,

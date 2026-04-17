@@ -18,7 +18,7 @@ const dateStr = new Date().toLocaleDateString('en-US', {
 const MEAL_ORDER = { Breakfast: 0, Lunch: 1, Dinner: 2, Snack: 3 };
 
 export default function DashboardTab() {
-  const [stats, setStats] = useState({ routines: 0, routinesDone: 0, tasks: 0, tasksDone: 0, spent: 0, mealsAdherence: 0 });
+  const [stats, setStats] = useState({ routines: 0, routinesDone: 0, tasks: 0, tasksDone: 0, spent: 0, fuelAdherence: 0 });
   const [focusTask, setFocusTask] = useState(null);
   const [streak, setStreak] = useState(null);
   const [energyLevel, setEnergyLevel] = useState(null);
@@ -28,35 +28,34 @@ export default function DashboardTab() {
 
   useEffect(() => {
     seedTodayData().then(async () => {
-      const [routines, tasks, expenses, meals, energyLogs, streakVal] = await Promise.all([
+      const [routines, tasks, expenses, meals, wellbeingLogs, streakVal] = await Promise.all([
         db.routines.where('date').equals(today).toArray(),
         db.tasks.where('date').equals(today).toArray(),
         db.expenses.where('date').equals(today).toArray(),
         db.meals.where('date').equals(today).toArray(),
-        db.energyLogs.where('date').equals(today).toArray(),
+        db.wellbeingLogs.where('date').equals(today).toArray(),
         computeStreak(),
       ]);
 
       const routinesDone = routines.filter(r => r.completed).length;
       const tasksDone    = tasks.filter(t => t.completed).length;
       const spent        = expenses.reduce((s, e) => s + e.amount, 0);
+      
       const mealsDone    = meals.filter(m => m.completed).length;
-      const mealsAdherence = meals.length ? Math.round((mealsDone / meals.length) * 100) : 0;
+      const fuelAdherence = meals.length ? Math.round((mealsDone / meals.length) * 100) : 0;
 
-      setStats({ routines: routines.length, routinesDone, tasks: tasks.length, tasksDone, spent, mealsAdherence });
+      setStats({ routines: routines.length, routinesDone, tasks: tasks.length, tasksDone, spent, fuelAdherence });
 
+      // Focus task logic (including carried forward)
       const incomplete = tasks.filter(t => !t.completed);
       incomplete.sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
       setFocusTask(incomplete[0] || null);
 
       setStreak(streakVal);
 
-      if (energyLogs.length > 0) {
-        const latest = energyLogs.sort((a, b) => a.time.localeCompare(b.time)).at(-1);
-        setEnergyLevel(latest.level);
-      } else {
-        setEnergyLevel(0);
-      }
+      // Energy level from wellbeing logs
+      const energyLog = wellbeingLogs.find(l => l.type === 'energy');
+      setEnergyLevel(energyLog ? energyLog.value : 0);
 
       const incompleteMeals = meals.filter(m => !m.completed);
       incompleteMeals.sort((a, b) => (MEAL_ORDER[a.mealType] ?? 4) - (MEAL_ORDER[b.mealType] ?? 4));
@@ -104,11 +103,11 @@ export default function DashboardTab() {
             <span className="text-xs font-semibold text-outline">Energy</span>
           </div>
           <span className="text-3xl font-headline font-black text-on-surface">
-            {energyLevel === null ? '—' : energyLevel === 0 ? '—' : `${energyLevel}/5`}
+            {energyLevel === null || energyLevel === 0 ? '—' : `${energyLevel}/10`}
           </span>
-          <div className="flex gap-1">
-            {[1,2,3,4,5].map(i => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${energyLevel && i <= energyLevel ? 'bg-secondary' : 'bg-outline-variant/30'}`} />
+          <div className="flex gap-0.5">
+            {[1,2,3,4,5,6,7,8,9,10].map(i => (
+              <div key={i} className={`h-1.5 flex-1 rounded-full ${energyLevel && i <= energyLevel ? 'bg-secondary shadow-[0_0_8px_rgba(var(--secondary-rgb),0.5)]' : 'bg-outline-variant/30'}`} />
             ))}
           </div>
         </div>
@@ -129,15 +128,15 @@ export default function DashboardTab() {
           </div>
         </div>
 
-        {/* Meals */}
+        {/* Fuel */}
         <div className="card-floating p-5 flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <span className="w-8 h-8 rounded-xl bg-tertiary/10 flex items-center justify-center">
-              <Icon name="restaurant" size={18} className="text-tertiary" />
+              <Icon name="nutrition" size={18} className="text-tertiary" />
             </span>
-            <span className="text-xs font-semibold text-outline">Meals</span>
+            <span className="text-xs font-semibold text-outline">Fuel</span>
           </div>
-          <span className="text-3xl font-headline font-black text-on-surface">{stats.mealsAdherence}%</span>
+          <span className="text-3xl font-headline font-black text-on-surface">{stats.fuelAdherence}%</span>
           <span className="text-xs text-outline">adherence today</span>
         </div>
       </div>
@@ -166,13 +165,13 @@ export default function DashboardTab() {
         <div className="flex gap-2 flex-wrap">
           {[
             { label: 'Log Morning', icon: 'wb_sunny',   to: '/morning'  },
-            { label: 'Check Energy', icon: 'bolt',      to: '/energy'   },
+            { label: 'Log Fuel', icon: 'nutrition',      to: '/nutrition' },
             { label: 'Add Expense', icon: 'payments',   to: '/money'    },
           ].map(({ label, icon, to }) => (
             <button
               key={to}
               onClick={() => navigate(to)}
-              className="flex items-center gap-2 bg-surface-container-low hover:bg-surface-container text-on-surface text-sm font-medium rounded-full px-4 py-2.5 transition-all active:scale-95"
+              className="flex items-center gap-2 bg-surface-container-low hover:bg-surface-container text-on-surface text-sm font-medium rounded-full px-4 py-2.5 transition-all active:scale-95 border border-outline-variant/10"
             >
               <Icon name={icon} size={16} className="text-primary" />
               {label}
@@ -204,7 +203,7 @@ export default function DashboardTab() {
             <span className="text-xs font-semibold text-outline">Spent Today</span>
           </div>
           <p className="text-sm font-semibold text-on-surface">&#8377;{stats.spent.toLocaleString()}</p>
-          <p className="text-xs text-outline mt-0.5">of &#8377;30,000/mo</p>
+          <p className="text-xs text-outline mt-0.5">of limit</p>
         </div>
       </div>
     </div>
