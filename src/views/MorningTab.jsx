@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, seedTodayData, computeStreak, rolloverHabitTemplates } from '../db/database';
+import { db, getTodayStr, seedTodayData, computeStreak, rolloverHabitTemplates, giftXP, updateLastRoutineCompletion } from '../db/database';
+import { scheduleNotifications } from '../lib/notifications';
+import StatsHeader from '../components/ui/StatsHeader';
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -17,6 +19,9 @@ const getEndTime = (start, durationMins) => {
   return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 };
 
+const toDateStr = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
 const getWeekDays = () => {
   const today = new Date();
   const dayOfWeek = today.getDay();
@@ -28,11 +33,10 @@ const getWeekDays = () => {
     const label = ['M','T','W','T','F','S','S'][i];
     const isToday = d.toDateString() === today.toDateString();
     const isPast  = d < today && !isToday;
-    return { label, isToday, isPast };
+    return { label, isToday, isPast, dateStr: toDateStr(d) };
   });
 };
 
-const WEEK_DAYS = getWeekDays();
 const EMPTY_FORM = { title: '', start: '07:00', duration: 30, type: 'routine' };
 const EMPTY_TEMPLATE_FORM = { title: '', startTime: '07:00', duration: 30, type: 'routine' };
 
@@ -240,15 +244,29 @@ export default function MorningTab() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [streak, setStreak] = useState(null);
   const [wakeTime, setWakeTime] = useState('07:00');
-  const [energyLevel, setEnergyLevel] = useState(7);
-  const [hasSavedEnergy, setHasSavedEnergy] = useState(false);
+  const [weekDays, setWeekDays] = useState([]);
   const today = getTodayStr();
+
+  const loadWeekDays = async () => {
+    const days = getWeekDays();
+    const pastDates = days.filter(d => d.isPast).map(d => d.dateStr);
+    const completionMap = {};
+    if (pastDates.length) {
+      const recs = await db.routines.where('date').anyOf(pastDates).toArray();
+      for (const date of pastDates) {
+        const dayRecs = recs.filter(r => r.date === date);
+        completionMap[date] = dayRecs.length > 0 && dayRecs.every(r => r.completed);
+      }
+    }
+    setWeekDays(days.map(d => ({ ...d, allDone: completionMap[d.dateStr] || false })));
+  };
 
   const loadRoutines = async () => {
     const data = await db.routines.where('date').equals(today).toArray();
     data.sort((a, b) => a.start.localeCompare(b.start));
     setRoutines(data);
     setLoading(false);
+    scheduleNotifications(data);
   };
 
   const loadTemplates = async () => {
@@ -266,24 +284,23 @@ export default function MorningTab() {
     if (saved) setWakeTime(saved.value);
   };
 
-  const loadEnergy = async () => {
-    const log = await db.wellbeingLogs.where({ date: today, type: 'energy' }).first();
-    if (log) {
-      setEnergyLevel(log.value);
-      setHasSavedEnergy(true);
-    }
-  };
-
   useEffect(() => {
     seedTodayData().then(async () => {
       await rolloverHabitTemplates(today);
-      await Promise.all([loadRoutines(), loadTemplates(), loadStreak(), loadWakeTime(), loadEnergy()]);
+      await Promise.all([loadRoutines(), loadTemplates(), loadStreak(), loadWakeTime(), loadWeekDays()]);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleToggle = async (routine) => {
-    await db.routines.update(routine.id, { completed: !routine.completed });
+    const isCompleting = !routine.completed;
+    await db.routines.update(routine.id, { completed: isCompleting });
+    
+    if (isCompleting) {
+      await giftXP(25, `Routine: ${routine.title}`);
+      await updateLastRoutineCompletion(); // Start synergy window
+    }
+    
     loadRoutines();
     loadStreak();
   };
@@ -308,45 +325,14 @@ export default function MorningTab() {
     await db.settings.put({ key: 'wakeTime', value: val });
   };
 
-  const handleEnergySave = async (val) => {
-    setEnergyLevel(val);
-    await db.wellbeingLogs.put({
-      date: today,
-      type: 'energy',
-      value: val,
-      timestamp: new Date().toISOString(),
-    });
-    setHasSavedEnergy(true);
-  };
-
-  const energyAdvice = useMemo(() => {
-    if (energyLevel >= 8) return {
-      title: 'Peak State',
-      advice: 'Your energy is high. Perfect time for deep work, complex problem solving, or a heavy workout.',
-      icon: 'bolt',
-      color: 'text-tertiary'
-    };
-    if (energyLevel >= 5) return {
-      title: 'Steady State',
-      advice: 'You have good momentum. Focus on consistent progress on your main projects and important meetings.',
-      icon: 'sync',
-      color: 'text-primary'
-    };
-    return {
-      title: 'Recovery State',
-      advice: 'Energy is low. Prioritize shallow work, admin tasks, and gentle movement. Don\'t forget to recharge.',
-      icon: 'battery_low',
-      color: 'text-error'
-    };
-  }, [energyLevel]);
-
   const completedCount = routines.filter(r => r.completed).length;
 
   return (
     <div className="flex flex-col min-h-screen">
+      <StatsHeader />
 
       {/* Header */}
-      <div className="pt-6 px-6 pb-6 bg-surface-container-low">
+      <div className="pt-4 px-6 pb-6 bg-surface-container-low">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-semibold text-outline uppercase tracking-wider mb-1">Morning Routine</p>
@@ -381,16 +367,17 @@ export default function MorningTab() {
       <div className="mx-4 mt-4 card-floating p-4">
         <p className="text-xs font-bold uppercase tracking-widest text-outline-variant mb-3">This Week</p>
         <div className="flex justify-between">
-          {WEEK_DAYS.map((day, i) => (
+          {weekDays.map((day, i) => (
             <div key={i} className="flex flex-col items-center gap-2">
               <span className="text-[10px] font-semibold text-outline">{day.label}</span>
               <div className={cn(
                 'w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all',
                 day.isToday ? 'bg-primary text-white ring-2 ring-primary/30' :
-                day.isPast  ? 'bg-secondary text-white' :
+                day.allDone ? 'bg-secondary text-white' :
+                day.isPast  ? 'bg-surface-container-high text-outline-variant' :
                               'bg-surface-container text-outline-variant'
               )}>
-                {day.isPast ? <Icon name="check" size={14} className="text-white" /> : (day.isToday ? '●' : '')}
+                {day.allDone ? <Icon name="check" size={14} className="text-white" /> : (day.isToday ? '●' : '')}
               </div>
             </div>
           ))}

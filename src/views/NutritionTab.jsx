@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
@@ -33,16 +33,13 @@ const MEAL_CONFIG = {
 
 const MEAL_ORDER = { Breakfast: 0, Lunch: 1, Dinner: 2, Snack: 3 };
 
-// ─── Calorie Ring ─────────────────────────────────────────────────────────────
+// ─── Essentials Ring ──────────────────────────────────────────────────────────
 
-function CalorieRing({ eaten, goal }) {
-  const pct = Math.min(eaten / goal, 1);
+function EssentialsRing({ done, total }) {
+  const pct = total > 0 ? Math.min(done / total, 1) : 0;
   const r = 44;
   const circ = 2 * Math.PI * r;
   const dash = circ * pct;
-  const remaining = Math.max(goal - eaten, 0);
-
-  const ringColor = pct >= 1 ? '#4caf50' : pct >= 0.7 ? 'var(--primary)' : 'var(--primary)';
 
   return (
     <div className="flex items-center gap-6">
@@ -51,33 +48,43 @@ function CalorieRing({ eaten, goal }) {
           <circle cx="50" cy="50" r={r} fill="none" stroke="currentColor" strokeWidth="8" className="text-surface-container-high" />
           <circle
             cx="50" cy="50" r={r} fill="none"
-            stroke="url(#calorieGrad)" strokeWidth="8"
+            stroke={pct >= 1 ? '#22c55e' : 'url(#essentialsGrad)'} strokeWidth="8"
             strokeDasharray={`${dash} ${circ}`}
             strokeLinecap="round"
             style={{ transition: 'stroke-dasharray 0.8s ease' }}
           />
           <defs>
-            <linearGradient id="calorieGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#7c3aed" />
-              <stop offset="100%" stopColor="#2563eb" />
+            <linearGradient id="essentialsGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#22c55e" />
+              <stop offset="100%" stopColor="#16a34a" />
             </linearGradient>
           </defs>
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-xl font-black text-on-surface leading-none">{eaten}</span>
-          <span className="text-[9px] font-bold text-outline uppercase tracking-wide">kcal</span>
+          {pct >= 1 && total > 0 ? (
+            <Icon name="check_circle" size={30} filled className="text-green-500" />
+          ) : (
+            <>
+              <span className="text-xl font-black text-on-surface leading-none">{done}/{total}</span>
+              <span className="text-[9px] font-bold text-outline uppercase tracking-wide">done</span>
+            </>
+          )}
         </div>
       </div>
       <div className="flex flex-col gap-2 flex-1">
         <div>
-          <p className="text-[10px] font-bold text-outline uppercase tracking-wider">Daily Goal</p>
-          <p className="text-2xl font-headline font-black text-on-surface">{goal}</p>
+          <p className="text-[10px] font-bold text-outline uppercase tracking-wider">Essentials Today</p>
+          <p className="text-2xl font-headline font-black text-on-surface">
+            {total > 0 ? `${Math.round(pct * 100)}%` : '—'}
+          </p>
         </div>
         <div className="h-1.5 bg-surface-container-high rounded-full overflow-hidden">
-          <div className="h-full bg-primary rounded-full transition-all duration-700" style={{ width: `${pct * 100}%` }} />
+          <div className="h-full bg-green-500 rounded-full transition-all duration-700" style={{ width: `${pct * 100}%` }} />
         </div>
         <p className="text-xs text-outline font-medium">
-          {pct >= 1 ? '✓ Goal reached' : `${remaining} kcal remaining`}
+          {total === 0 ? 'No essentials scheduled today' :
+           pct >= 1 ? '✓ All essentials covered!' :
+           `${total - done} essential${total - done !== 1 ? 's' : ''} remaining`}
         </p>
       </div>
     </div>
@@ -125,11 +132,6 @@ function MealCard({ meal, onToggle, onDelete, onEdit }) {
         <p className={cn('font-semibold text-sm text-on-surface truncate', meal.completed && 'line-through text-outline')}>
           {meal.title}
         </p>
-        {meal.calories > 0 && (
-          <span className="text-[11px] font-bold text-outline bg-surface-container px-2 py-0.5 rounded-full mt-0.5 inline-block">
-            {meal.calories} kcal
-          </span>
-        )}
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
         <button onClick={onEdit} className="text-outline-variant hover:text-primary transition-colors p-1">
@@ -151,7 +153,7 @@ function MealCard({ meal, onToggle, onDelete, onEdit }) {
 // ─── Meal Form ────────────────────────────────────────────────────────────────
 
 function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealType = 'Breakfast' }) {
-  const [form, setForm] = useState(initialData || { mealType: defaultMealType, title: '', calories: '' });
+  const [form, setForm] = useState(initialData || { mealType: defaultMealType, title: '' });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -159,11 +161,10 @@ function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealTy
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.title.trim()) return;
-    const caloriesVal = form.calories !== '' ? Number(form.calories) : null;
     if (editId) {
-      await db.meals.update(editId, { mealType: form.mealType, title: form.title.trim(), calories: caloriesVal });
+      await db.meals.update(editId, { mealType: form.mealType, title: form.title.trim() });
     } else {
-      await db.meals.add({ date: forDate, mealType: form.mealType, title: form.title.trim(), completed: false, calories: caloriesVal });
+      await db.meals.add({ date: forDate, mealType: form.mealType, title: form.title.trim(), completed: false });
     }
     onSave();
     onClose();
@@ -172,15 +173,12 @@ function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealTy
   const handleAiSuggest = async () => {
     setAiLoading(true);
     setAiSuggestion('');
-    const prompt = `Suggest a healthy, simple Indian ${form.mealType.toLowerCase()} meal. Respond with just the name, and an estimated calorie count in parentheses. One suggestion only. Example: "Masala oats with boiled egg (320)"`;
+    const prompt = `Suggest a healthy, simple Indian ${form.mealType.toLowerCase()} meal. Just the name, one suggestion only. Example: "Masala oats with boiled egg"`;
     const result = await askGemini(prompt);
     if (result) {
-      setAiSuggestion(result.trim());
-      // Auto-fill if suggestion contains calorie
-      const calMatch = result.match(/\((\d+)\)/);
       const name = result.replace(/\(.*\)/, '').trim();
+      setAiSuggestion(name);
       set('title', name);
-      if (calMatch) set('calories', calMatch[1]);
     }
     setAiLoading(false);
   };
@@ -211,12 +209,6 @@ function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealTy
         )}
         <input className="input-pill w-full text-sm" placeholder="e.g. Oatmeal with berries"
           value={form.title} onChange={e => set('title', e.target.value)} required autoFocus />
-      </div>
-
-      <div>
-        <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Calories (optional)</label>
-        <input type="number" className="input-pill w-full text-sm" placeholder="e.g. 450"
-          value={form.calories} onChange={e => set('calories', e.target.value)} />
       </div>
 
       <button type="submit" className="btn-primary w-full py-4 font-bold shadow-gradient">
@@ -282,7 +274,7 @@ function ManageCategoriesSheet({ categories, onRefresh }) {
           </button>
         </div>
       ))}
-      <BottomSheet isOpen={!!editTarget} onClose={() => setEditTarget(null)} title={`Edit · ${editTarget?.name}`}>
+      <BottomSheet isOpen={!!editTarget} onClose={() => setEditTarget(null)} title={`Edit · ${editTarget?.name}`} zIndex={200}>
         <EditCategorySheet category={editTarget} onSave={onRefresh} onClose={() => setEditTarget(null)} />
       </BottomSheet>
     </div>
@@ -332,7 +324,6 @@ export default function NutritionTab() {
   const [selectedDay, setSelectedDay] = useState(getTodayStr());
 
   const [meals, setMeals] = useState([]);
-  const [calorieGoal, setCalorieGoal] = useState(2200);
   const [groceryItems, setGroceryItems] = useState([]);
   const [newGroceryItem, setNewGroceryItem] = useState('');
   const [showMealForm, setShowMealForm] = useState(false);
@@ -350,18 +341,16 @@ export default function NutritionTab() {
     await seedTodayData();
     await generateWeeklySchedule(weekStart);
 
-    const [cats, sch, ml, settings, groceries] = await Promise.all([
+    const [cats, sch, ml, groceries] = await Promise.all([
       db.nutritionCategories.orderBy('order').toArray(),
       db.weeklySchedule.where('weekStart').equals(weekStart).toArray(),
       db.meals.where('date').equals(selectedDay).toArray(),
-      db.settings.get('calorieGoal'),
       db.groceryItems.where('weekStart').equals(weekStart).toArray()
     ]);
 
     setCategories(cats);
     setWeekDates(getWeekDates(today));
     setMeals(ml.sort((a, b) => (MEAL_ORDER[a.mealType] || 0) - (MEAL_ORDER[b.mealType] || 0)));
-    setCalorieGoal(settings?.value || 2200);
     setGroceryItems(groceries);
 
     const sm = {};
@@ -408,11 +397,13 @@ export default function NutritionTab() {
   };
 
   // Stats
-  const totalCals = meals.reduce((s, m) => s + (m.calories || 0), 0);
   const selectedDayIdx = getTodayWeekIndex(selectedDay);
   const assignedCats = categories.filter(c => c.active && (scheduleMap[c.id] || []).includes(selectedDayIdx));
   const checkedCount = assignedCats.filter(c => logs.has(c.id)).length;
   const nutritionPct = assignedCats.length ? Math.round((checkedCount / assignedCats.length) * 100) : 0;
+  const mustCats  = assignedCats.filter(c => c.priority === 'must');
+  const mustTotal = mustCats.length;
+  const mustDone  = mustCats.filter(c => logs.has(c.id)).length;
   const groceryPending = groceryItems.filter(g => !g.checked).length;
 
   return (
@@ -454,7 +445,7 @@ export default function NutritionTab() {
 
         {/* Calorie Ring + Quick Add */}
         <section className="card-floating p-5 space-y-4">
-          <CalorieRing eaten={totalCals} goal={calorieGoal} />
+          <EssentialsRing done={mustDone} total={mustTotal} />
           <div className="border-t border-outline-variant/20 pt-4">
             <p className="text-[10px] font-black text-outline uppercase tracking-widest mb-2">Quick Add Meal</p>
             <MealTypeGrid
@@ -527,7 +518,7 @@ export default function NutritionTab() {
         <MealForm
           onSave={loadAll}
           onClose={() => { setShowMealForm(false); setEditMeal(null); }}
-          initialData={editMeal ? { mealType: editMeal.mealType, title: editMeal.title, calories: editMeal.calories || '' } : null}
+          initialData={editMeal ? { mealType: editMeal.mealType, title: editMeal.title } : null}
           editId={editMeal?.id}
           forDate={selectedDay}
           defaultMealType={mealFormType}

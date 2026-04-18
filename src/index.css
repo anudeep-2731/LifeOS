@@ -6,6 +6,10 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --secondary-rgb: 103, 80, 164;
+  }
+
   body {
     @apply bg-surface text-on-surface font-sans antialiased;
     scroll-behavior: smooth;
@@ -56,4 +60,9 @@
   .primary-gradient {
     background: linear-gradient(135deg, #005da7 0%, #2976c7 100%);
   }
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
 }

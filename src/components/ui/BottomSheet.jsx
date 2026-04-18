@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { cn } from '../../lib/utils';
 import Icon from './Icon';
 
-export default function BottomSheet({ isOpen, onClose, title, children }) {
+export default function BottomSheet({ isOpen, onClose, title, children, zIndex = 100 }) {
   // Lock body scroll while open
   useEffect(() => {
     if (isOpen) {
@@ -16,7 +16,7 @@ export default function BottomSheet({ isOpen, onClose, title, children }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex flex-col justify-end">
+    <div className="fixed inset-0 flex flex-col justify-end" style={{ zIndex }}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-inverse-surface/40 backdrop-blur-sm"
@@ -52,12 +52,6 @@ export default function BottomSheet({ isOpen, onClose, title, children }) {
         </div>
       </div>
 
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(100%); }
-          to   { transform: translateY(0); }
-        }
-      `}</style>
     </div>
   );
 }

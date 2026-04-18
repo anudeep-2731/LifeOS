@@ -95,6 +95,24 @@ db.version(8).stores({
   weeklySchedule: '++id, weekStart, categoryId',
 });
 
+// Version 9: Gamification stats and history
+db.version(9).stores({
+  wellbeingLogs: '++id, date, type, timestamp, value, note',
+  tasks: '++id, date, dueDate, title, duration, priority, postponeCount, completed, scheduledTime, recurring',
+  expenses: '++id, date, timestamp, amount, category, description, emailBody',
+  routines: '++id, date, title, start, duration, type, completed, taskId',
+  meals: '++id, date, day, mealType, title, completed, calories',
+  energyLogs: '++id, date, time, level, tag, note',
+  settings: 'key',
+  investments: '++id, month, category, amount, note',
+  habitTemplates: '++id, title, startTime, duration, type, active',
+  groceryItems: '++id, weekStart, name, checked',
+  nutritionCategories: '++id, name, frequency, userFrequency, priority, colorKey, order, active',
+  nutritionLogs: '++id, date, categoryId',
+  weeklySchedule: '++id, weekStart, categoryId',
+  userStats: 'key',
+});
+
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
 export const getTodayStr = () => {
@@ -284,6 +302,77 @@ export const seedTodayData = async () => {
   if (!wakeTime) await db.settings.put({ key: 'wakeTime', value: '07:00' });
 
   await seedNutritionDefaults();
+
+  const xp = await db.userStats.get('xp');
+  if (!xp) await db.userStats.put({ key: 'xp', value: 0 });
+
+  const level = await db.userStats.get('level');
+  if (!level) await db.userStats.put({ key: 'level', value: 1 });
+
+  const rank = await db.userStats.get('rank');
+  if (!rank) await db.userStats.put({ key: 'rank', value: 'Initiate' });
+};
+
+// ─── Gamification Helpers ────────────────────────────────────────────────────
+
+export const getXP = async () => {
+  const xp = await db.userStats.get('xp');
+  const level = await db.userStats.get('level');
+  return { xp: xp?.value || 0, level: level?.value || 1 };
+};
+
+export const giftXP = async (amount, reason) => {
+  const current = await db.userStats.get('xp');
+  const newXP = (current?.value || 0) + amount;
+  await db.userStats.put({ key: 'xp', value: newXP });
+
+  // Simple leveling: 1000 XP per level
+  const oldLevel = Math.floor((current?.value || 0) / 1000) + 1;
+  const newLevel = Math.floor(newXP / 1000) + 1;
+
+  if (newLevel > oldLevel) {
+    await db.userStats.put({ key: 'level', value: newLevel });
+    // Update Rank
+    const ranks = ['Initiate', 'Novice', 'Specialist', 'Expert', 'Master', 'Legend'];
+    const rankIdx = Math.min(newLevel - 1, ranks.length - 1);
+    await db.userStats.put({ key: 'rank', value: ranks[rankIdx] });
+  }
+
+  // Log for potential notification/UI feedback
+  console.log(`[XP] +${amount} (${reason})`);
+  return { newXP, leveledUp: newLevel > oldLevel };
+};
+
+/** Tracks synergy - if a task is done within 20 mins of a routine */
+export const checkSynergyBonus = async () => {
+  const lastRoutineStr = await db.userStats.get('lastRoutineCompletion');
+  if (!lastRoutineStr) return false;
+
+  const lastTime = new Date(lastRoutineStr.value).getTime();
+  const now = new Date().getTime();
+  const diffMins = (now - lastTime) / (1000 * 60);
+
+  if (diffMins <= 20) {
+    await db.userStats.delete('lastRoutineCompletion'); // Only one bonus per routine
+    return true;
+  }
+  return false;
+};
+
+export const updateLastRoutineCompletion = async () => {
+  await db.userStats.put({ key: 'lastRoutineCompletion', value: new Date().toISOString() });
+};
+
+// ─── Victory Log Helpers ─────────────────────────────────────────────────────
+
+export const saveVictory = async (victoryText) => {
+  const today = getTodayStr();
+  await db.userStats.put({ key: `victory_${today}`, value: victoryText });
+};
+
+export const getVictory = async (date) => {
+  const v = await db.userStats.get(`victory_${date}`);
+  return v?.value || null;
 };
 
 // ─── Nutrition helpers ────────────────────────────────────────────────────────

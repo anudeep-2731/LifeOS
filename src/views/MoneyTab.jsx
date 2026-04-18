@@ -70,6 +70,12 @@ function ExpenseForm({ onSave, onClose, initialData, editId }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {editId && initialData?.date && (
+        <div className="flex items-center gap-2 px-1">
+          <span className="text-[10px] font-bold text-outline uppercase tracking-wider">Transaction date:</span>
+          <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">{initialData.date}</span>
+        </div>
+      )}
       <div>
         <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Description</label>
         <input className="input-pill w-full text-sm" placeholder="e.g. Coffee & Sandwich"
@@ -95,6 +101,18 @@ function ExpenseForm({ onSave, onClose, initialData, editId }) {
           })}
         </div>
       </div>
+      {editId && initialData?.emailBody && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-outline font-semibold select-none flex items-center gap-1.5 px-1">
+            <Icon name="mail" size={13} className="text-outline" /> Source email
+          </summary>
+          <div className="mt-2 bg-surface-container rounded-xl p-3 border border-outline-variant/20 max-h-28 overflow-y-auto">
+            <p className="font-mono text-[11px] text-outline leading-relaxed whitespace-pre-wrap break-words">
+              {initialData.emailBody.substring(0, 400)}
+            </p>
+          </div>
+        </details>
+      )}
       <button type="submit" className="btn-primary w-full text-center">
         {editId ? 'Save Changes' : 'Add Expense'}
       </button>
@@ -224,6 +242,13 @@ export default function MoneyTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedMonth]);
 
+  useEffect(() => {
+    const handler = () => loadData();
+    window.addEventListener('life-os:settings-saved', handler);
+    return () => window.removeEventListener('life-os:settings-saved', handler);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMonth]);
+
   const handleDelete = async (expense) => {
     await db.expenses.delete(expense.id);
     loadData();
@@ -236,8 +261,10 @@ export default function MoneyTab() {
   const barColor   = pct > 90 ? 'bg-error' : pct > 70 ? 'bg-tertiary' : 'bg-primary';
 
   const now = new Date();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const daysRemaining = Math.max(daysInMonth - now.getDate() + 1, 1);
+  const [selYear, selMonth0] = selectedMonth.split('-').map(Number);
+  const daysInMonth = new Date(selYear, selMonth0, 0).getDate();
+  const isCurrentMonth = selectedMonth === getMonthStr();
+  const daysRemaining = isCurrentMonth ? Math.max(daysInMonth - now.getDate() + 1, 1) : daysInMonth;
   const dailyAllowance = Math.max(remaining / daysRemaining, 0);
 
   const catTotals = useMemo(() => {
@@ -320,7 +347,7 @@ export default function MoneyTab() {
           {investCats.map(cat => {
             const existing = investments.find(inv => inv.category === cat);
             return (
-              <InvestmentInput key={cat} category={cat} date={selectedMonth}
+              <InvestmentInput key={`${cat}-${selectedMonth}`} category={cat} date={selectedMonth}
                 defaultValue={existing?.amount || 0} onSave={loadData} />
             );
           })}
@@ -441,7 +468,7 @@ export default function MoneyTab() {
       <BottomSheet isOpen={!!editExpense} onClose={() => setEditExpense(null)} title="Edit Expense">
         {editExpense && (
           <ExpenseForm
-            initialData={{ description: editExpense.description, amount: editExpense.amount, category: editExpense.category }}
+            initialData={{ description: editExpense.description, amount: editExpense.amount, category: editExpense.category, date: editExpense.date, emailBody: editExpense.emailBody }}
             editId={editExpense.id}
             onSave={loadData}
             onClose={() => setEditExpense(null)}

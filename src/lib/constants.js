@@ -1,5 +1,3 @@
-export const BUDGET_TOTAL = 30000;
-
 export const CATEGORY_CONFIG = {
   Food:        { icon: 'local_cafe',      color: 'text-primary',    bg: 'bg-primary/10'    },
   Transport:   { icon: 'directions_car',  color: 'text-secondary',  bg: 'bg-secondary/10'  },

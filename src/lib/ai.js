@@ -112,3 +112,40 @@ export async function prioritizeTasksWithAI(tasks) {
 
   return await askGemini(prompt);
 }
+
+/**
+ * Analyzes the best "Flow Hours" by looking at routines and tasks.
+ */
+export async function analyzeFlowWithAI(tasks, routines) {
+  const taskData = tasks.filter(t => !t.completed).map(t => `${t.title} (${t.duration}m, ${t.priority})`).join(', ');
+  const routineData = routines.map(r => `${r.title} (${r.start}-${r.duration}m)`).join(', ');
+
+  const prompt = `
+    You are a high-performance productivity coach. 
+    Review these Tasks: [${taskData}] 
+    And these Routines: [${routineData}]
+    
+    1. Identify the "Golden Hour" (best 60-min slot for high focus).
+    2. Suggest which task to "stack" right after a routine for maximum momentum.
+    3. Keep it to 3 bullet points, very punchy.
+  `;
+
+  return await askGemini(prompt);
+}
+
+/**
+ * Breaks a complex task into 5-minute atomic steps.
+ */
+export async function simplifyTaskWithAI(taskTitle) {
+  const prompt = `
+    This task is being postponed repeatedly: "${taskTitle}".
+    Break it down into 4-5 "Atomic Steps" that each take less than 5 minutes to start.
+    Make them so easy they are impossible to procrastinate on.
+    
+    Format:
+    - Step 1
+    - Step 2...
+  `;
+
+  return await askGemini(prompt);
+}

@@ -9,30 +9,21 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
   const [categories, setCategories] = useState([]);
   const [newCat, setNewCat] = useState('');
   const [categoryBudgets, setCategoryBudgets] = useState({});
-  const [calorieGoal, setCalorieGoal] = useState(2200);
-  const [geminiApiKey, setGeminiApiKey] = useState('');
-  const [gmailClientId, setGmailClientId] = useState('');
 
   useEffect(() => {
     if (isOpen) loadSettings();
   }, [isOpen]);
 
   const loadSettings = async () => {
-    const [b, c, cb, cg, ai, g] = await Promise.all([
+    const [b, c, cb] = await Promise.all([
       db.settings.get('monthlyBudget'),
       db.settings.get('investmentCategories'),
       db.settings.get('categoryBudgets'),
-      db.settings.get('calorieGoal'),
-      db.settings.get('geminiApiKey'),
-      db.settings.get('gmailClientId')
     ]);
 
     if (b) setBudget(b.value);
     if (c) setCategories(c.value);
     if (cb) setCategoryBudgets(cb.value || {});
-    if (cg) setCalorieGoal(cg.value);
-    if (ai) setGeminiApiKey(ai.value);
-    if (g) setGmailClientId(g.value);
   };
 
   const handleSave = async () => {
@@ -40,10 +31,8 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
       db.settings.put({ key: 'monthlyBudget', value: Number(budget) }),
       db.settings.put({ key: 'investmentCategories', value: categories }),
       db.settings.put({ key: 'categoryBudgets', value: categoryBudgets }),
-      db.settings.put({ key: 'calorieGoal', value: Number(calorieGoal) }),
-      db.settings.put({ key: 'geminiApiKey', value: geminiApiKey }),
-      db.settings.put({ key: 'gmailClientId', value: gmailClientId })
     ]);
+    window.dispatchEvent(new CustomEvent('life-os:settings-saved'));
     onSave();
     onClose();
   };
@@ -61,28 +50,6 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title="Finance Settings">
       <div className="space-y-6">
-
-        {/* AI & API Section */}
-        <section className="bg-primary/5 rounded-3xl p-5 border border-primary/10">
-          <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-4 flex items-center gap-2">
-            <Icon name="auto_awesome" size={14} /> AI & Integrations
-          </p>
-          <div className="space-y-4">
-            <div>
-              <label className="text-[11px] font-bold text-outline uppercase block mb-1.5 ml-1">Gemini API Key</label>
-              <input type="password" placeholder="Enter API Key" className="input-pill w-full text-xs"
-                value={geminiApiKey} onChange={e => setGeminiApiKey(e.target.value)} />
-            </div>
-            <div>
-              <label className="text-[11px] font-bold text-outline uppercase block mb-1.5 ml-1">Gmail Client ID</label>
-              <input type="text" placeholder="Enter Client ID" className="input-pill w-full text-xs text-on-surface"
-                value={gmailClientId} onChange={e => setGmailClientId(e.target.value)} />
-            </div>
-          </div>
-          <p className="text-[9px] text-outline mt-3 ml-1 italic leading-relaxed">
-            Keys are stored locally in your browser and never sent to our servers.
-          </p>
-        </section>
 
         {/* Monthly Budget */}
         <div>
@@ -116,15 +83,6 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
               );
             })}
           </div>
-        </div>
-
-        {/* Calorie Goal */}
-        <div>
-          <label className="text-[11px] font-bold text-outline uppercase tracking-wider block mb-2 ml-1">
-            Daily Calorie Goal (kcal)
-          </label>
-          <input type="number" step="50" className="input-pill w-full text-lg font-headline font-bold text-tertiary"
-            value={calorieGoal} onChange={e => setCalorieGoal(e.target.value)} />
         </div>
 
         {/* Investment Categories */}

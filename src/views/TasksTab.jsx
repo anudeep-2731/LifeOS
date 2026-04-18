@@ -1,8 +1,10 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, seedTodayData, rolloverRecurringTasks } from '../db/database';
+import { db, getTodayStr, seedTodayData, rolloverRecurringTasks, giftXP, checkSynergyBonus } from '../db/database';
+import { prioritizeTasksWithAI, analyzeFlowWithAI, simplifyTaskWithAI } from '../lib/ai';
+import StatsHeader from '../components/ui/StatsHeader';
 
 const PRIORITY_BORDER = {
   high:   'border-error',
@@ -75,6 +77,11 @@ function TaskCard({ task, onToggle, onDelete, onPostpone, onEdit }) {
               </span>
             )}
           </div>
+          <div className="mt-2 flex items-center gap-1.5">
+             <span className="text-[10px] font-black text-primary/60 uppercase tracking-widest flex items-center gap-1">
+               <Icon name="bolt" size={10} /> +{task.priority === 'high' ? 150 : task.priority === 'medium' ? 100 : 50} XP
+             </span>
+          </div>
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0">
@@ -96,9 +103,18 @@ function TaskCard({ task, onToggle, onDelete, onPostpone, onEdit }) {
               <Icon name="schedule" size={18} />
             </button>
           )}
-          <button onClick={onDelete} className="text-outline-variant hover:text-error transition-colors p-1" aria-label="Delete task">
+          <button onClick={() => onDelete(task)} className="text-outline-variant hover:text-error transition-colors p-1" aria-label="Delete task">
             <Icon name="delete" size={18} />
           </button>
+          {task.postponeCount >= 2 && !task.completed && (
+            <button
+               onClick={() => onEdit(task, false, true)}
+               className="text-tertiary hover:scale-110 p-1 flex items-center justify-center"
+               title="Simplify this task"
+            >
+               <Icon name="auto_fix_high" size={20} />
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -208,6 +224,13 @@ export default function TasksTab() {
   const [showScheduleSheet, setShowScheduleSheet] = useState(false);
   const [taskToSchedule, setTaskToSchedule] = useState(null);
   const [scheduleTime, setScheduleTime] = useState('09:00');
+  const [showAiSheet, setShowAiSheet] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [flowAnalysis, setFlowAnalysis] = useState(null);
+  const [showFlowSheet, setShowFlowSheet] = useState(false);
+  const [simplifiedSteps, setSimplifiedSteps] = useState(null);
+  const [isSimplifying, setIsSimplifying] = useState(false);
   const today = getTodayStr();
 
   const loadTasks = async () => {
@@ -236,7 +259,25 @@ export default function TasksTab() {
   }, []);
 
   const handleToggle = async (task) => {
-    await db.tasks.update(task.id, { completed: !task.completed });
+    const isCompleting = !task.completed;
+    await db.tasks.update(task.id, { completed: isCompleting });
+    
+    if (isCompleting) {
+      // Award base XP
+      const baseXP = task.priority === 'high' ? 150 : task.priority === 'medium' ? 100 : 50;
+      let totalAwarded = baseXP;
+      let msg = `Completed: ${task.title}`;
+
+      // Check Synergy Bonus
+      const hasSynergy = await checkSynergyBonus();
+      if (hasSynergy) {
+        totalAwarded += 50;
+        msg += " + Synergy Bonus!";
+      }
+
+      await giftXP(totalAwarded, msg);
+    }
+    
     loadTasks();
   };
 
@@ -246,9 +287,9 @@ export default function TasksTab() {
   };
 
   const handlePostpone = async (task) => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const t = new Date();
+    const tm = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
+    const tomorrowStr = `${tm.getFullYear()}-${String(tm.getMonth()+1).padStart(2,'0')}-${String(tm.getDate()).padStart(2,'0')}`;
     await db.tasks.update(task.id, { 
       date: tomorrowStr,
       dueDate: tomorrowStr,
@@ -274,13 +315,45 @@ export default function TasksTab() {
     loadTasks();
   };
 
-  const handleEdit = (task, scheduleDirectly = false) => {
+  const handleEdit = (task, scheduleDirectly = false, simplifyDirectly = false) => {
     if (scheduleDirectly) {
       setTaskToSchedule(task);
       setShowScheduleSheet(true);
+    } else if (simplifyDirectly) {
+      handleSimplifyTask(task);
     } else {
       setEditTask(task);
     }
+  };
+
+  const handleFlowAnalysis = async () => {
+    setAiLoading(true);
+    setShowFlowSheet(true);
+    const [routines] = await Promise.all([
+      db.routines.where('date').equals(today).toArray()
+    ]);
+    const analysis = await analyzeFlowWithAI(tasks, routines);
+    setFlowAnalysis(analysis);
+    setAiLoading(false);
+  };
+
+  const handleSimplifyTask = async (task) => {
+    setIsSimplifying(true);
+    setAiLoading(true);
+    const steps = await simplifyTaskWithAI(task.title);
+    setSimplifiedSteps({ title: task.title, steps });
+    setAiLoading(false);
+    setIsSimplifying(false);
+  };
+
+  const handleAiPrioritize = async () => {
+    setShowAiSheet(true);
+    setAiLoading(true);
+    setAiResult(null);
+    const allPending = [...incompleteToday, ...carriedForward];
+    const result = await prioritizeTasksWithAI(allPending);
+    setAiResult(result);
+    setAiLoading(false);
   };
 
   const incompleteToday = tasks.filter(t => !t.completed);
@@ -290,16 +363,30 @@ export default function TasksTab() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <div className="pt-6 px-6 pb-6 bg-surface-container-low">
+      <StatsHeader />
+      
+      <div className="pt-4 px-6 pb-6 bg-surface-container-low">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-semibold text-outline uppercase tracking-wider mb-1">Productivity</p>
             <h1 className="text-2xl font-headline font-bold text-on-surface">Tasks</h1>
           </div>
-          <button onClick={() => setShowForm(true)}
-            className="primary-gradient text-white text-xs font-bold rounded-full px-4 py-2 shadow-gradient active:scale-95 transition-all flex items-center gap-1.5">
-            <Icon name="add" size={14} /> Add Task
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={handleFlowAnalysis}
+              className="flex items-center gap-1.5 text-[10px] font-bold text-tertiary bg-tertiary/10 px-3 py-1.5 rounded-full active:scale-95 transition-all">
+              <Icon name="insights" size={12} /> Flow Analysis
+            </button>
+            {(incompleteToday.length + carriedForward.length) >= 3 && (
+              <button onClick={handleAiPrioritize}
+                className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-full active:scale-95 transition-all">
+                <Icon name="auto_awesome" size={12} /> Prioritize
+              </button>
+            )}
+            <button onClick={() => setShowForm(true)}
+              className="primary-gradient text-white text-xs font-bold rounded-full px-4 py-2 shadow-gradient active:scale-95 transition-all flex items-center gap-1.5">
+              <Icon name="add" size={14} /> Add Task
+            </button>
+          </div>
         </div>
       </div>
 
@@ -393,6 +480,24 @@ export default function TasksTab() {
         )}
       </BottomSheet>
 
+      <BottomSheet isOpen={showAiSheet} onClose={() => { setShowAiSheet(false); setAiResult(null); }} title="AI Priority">
+        {aiLoading ? (
+          <div className="flex items-center justify-center gap-3 py-10 text-primary">
+            <Icon name="sync" size={20} className="animate-spin" />
+            <p className="text-sm font-medium">Analysing tasks...</p>
+          </div>
+        ) : aiResult ? (
+          <div className="space-y-3">
+            <p className="text-xs text-outline px-1 mb-4">Ranked by priority, due date, and postpone history:</p>
+            {aiResult.split('\n').filter(Boolean).map((line, i) => (
+              <div key={i} className="p-4 rounded-2xl bg-surface-container-low border border-outline-variant/10">
+                <p className="text-sm text-on-surface leading-relaxed">{line}</p>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </BottomSheet>
+
       <BottomSheet isOpen={showScheduleSheet} onClose={() => setShowScheduleSheet(false)} title="Schedule to Routine">
         <div className="space-y-4">
           <p className="text-sm text-outline">
@@ -402,6 +507,50 @@ export default function TasksTab() {
           <button onClick={handleScheduleToRoutine} className="btn-primary w-full py-4 shadow-gradient font-bold">
             Confirm Schedule
           </button>
+        </div>
+      </BottomSheet>
+
+      {/* AI Flow Analysis Sheet */}
+      <BottomSheet isOpen={showFlowSheet} onClose={() => setShowFlowSheet(false)} title="Synergy Flow Analysis">
+        {aiLoading ? (
+           <div className="flex flex-col items-center justify-center py-10 gap-4">
+              <Icon name="sync" size={32} className="text-primary animate-spin" />
+              <p className="text-sm font-semibold text-outline">Architecting your day...</p>
+           </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="primary-gradient/10 border border-primary/20 rounded-2xl p-4">
+               <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Performance Intelligence</p>
+               <div className="prose prose-sm text-on-surface whitespace-pre-wrap leading-relaxed">
+                  {flowAnalysis || "No analysis available. Add more tasks and routines to get started."}
+               </div>
+            </div>
+            <button onClick={() => setShowFlowSheet(false)} className="btn-primary w-full py-4 uppercase font-black tracking-widest">
+               Got it
+            </button>
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Task Simplification (Atomic) Sheet */}
+      <BottomSheet isOpen={!!simplifiedSteps} onClose={() => setSimplifiedSteps(null)} title="Atomic Breakdown">
+        <div className="space-y-4">
+           <div className="bg-tertiary/10 border border-tertiary/20 rounded-2xl p-4">
+              <p className="text-xs font-bold text-tertiary mb-1">Obstacle Detected</p>
+              <p className="text-sm text-on-surface font-semibold mb-3">"{simplifiedSteps?.title}" feels too big. Start with these:</p>
+              <div className="space-y-2">
+                 {simplifiedSteps?.steps?.split('\n').filter(s => s.trim()).map((step, i) => (
+                    <div key={i} className="flex items-center gap-3 bg-white/50 p-3 rounded-xl border border-tertiary/5">
+                       <span className="w-6 h-6 rounded-full bg-tertiary text-white text-[10px] flex items-center justify-center font-bold">{i+1}</span>
+                       <span className="text-sm text-on-surface">{step.replace(/^-\s*/, '')}</span>
+                    </div>
+                 ))}
+              </div>
+           </div>
+           <p className="text-[10px] text-outline text-center px-4 italic">The goal isn't to finish the task. The goal is to start the first step.</p>
+           <button onClick={() => setSimplifiedSteps(null)} className="btn-primary bg-tertiary w-full py-4 uppercase font-black tracking-widest">
+              Level Up
+           </button>
         </div>
       </BottomSheet>
     </div>

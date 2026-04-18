@@ -4,7 +4,7 @@ import Icon from './Icon';
 import { parseAlert } from '../../lib/parser';
 import { db, getTodayStr } from '../../db/database';
 import { initGmail, authenticate, fetchBankEmails } from '../../lib/gmail';
-import { parseTransactionWithAI } from '../../lib/ai';
+import { parseTransactionWithAI, askGemini } from '../../lib/ai';
 
 export default function SmartImportSheet({ isOpen, onClose, onSave }) {
   const [isFetching, setIsFetching] = useState(false);
@@ -63,6 +63,16 @@ export default function SmartImportSheet({ isOpen, onClose, onSave }) {
           continue;
         }
 
+        // 3b. If description is missing/unknown, ask AI for merchant name
+        if (!result.description || result.description.toLowerCase() === 'unknown') {
+          const shortBody = (email.fullBody || email.snippet || '').substring(0, 300);
+          const merchant = await askGemini(
+            `Extract only the merchant/store name (2-4 words max) from this bank alert. Return just the name, nothing else: "${shortBody}"`
+          );
+          result.description = merchant?.trim().replace(/"/g, '').substring(0, 50) || 'Other Purchase';
+          usedAI = true;
+        }
+
         // 4. Use email date (most accurate) - email.internalDate is YYYY-MM-DD
         const entryDate = email.internalDate || getTodayStr();
 
@@ -87,7 +97,7 @@ export default function SmartImportSheet({ isOpen, onClose, onSave }) {
           timestamp,
           amount: Number(result.amount),
           category: result.category || 'Other',
-          description: (result.description || 'Unknown').trim(),
+          description: (result.description || 'Other Purchase').trim(),
           emailBody: emailBody.substring(0, 800), // cap storage
         });
         
@@ -95,7 +105,7 @@ export default function SmartImportSheet({ isOpen, onClose, onSave }) {
           id,
           date: entryDate,
           amount: Number(result.amount),
-          description: (result.description || 'Unknown').trim(),
+          description: (result.description || 'Other Purchase').trim(),
           category: result.category || 'Other',
           emailBody: emailBody.substring(0, 300),
           subject: email.subject,
