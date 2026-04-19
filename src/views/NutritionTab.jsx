@@ -1,11 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
 import {
   db, getTodayStr, seedTodayData,
-  getWeekStart, getWeekDates, getTodayWeekIndex,
-  generateWeeklySchedule,
+  getWeekStart, getWeekDates
 } from '../db/database';
 import { askGemini } from '../lib/ai';
 
@@ -132,6 +131,15 @@ function MealCard({ meal, onToggle, onDelete, onEdit }) {
         <p className={cn('font-semibold text-sm text-on-surface truncate', meal.completed && 'line-through text-outline')}>
           {meal.title}
         </p>
+        {meal.tags && meal.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {meal.tags.map(tag => (
+              <span key={tag} className={cn("text-[9px] font-bold px-2 py-0.5 rounded border", meal.completed ? 'border-outline-variant/30 text-outline-variant bg-surface-container-low' : 'border-primary/20 text-primary bg-primary/5')}>
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-1 flex-shrink-0">
         <button onClick={onEdit} className="text-outline-variant hover:text-primary transition-colors p-1">
@@ -146,14 +154,15 @@ function MealCard({ meal, onToggle, onDelete, onEdit }) {
           <Icon name="delete" size={16} />
         </button>
       </div>
+
     </div>
   );
 }
 
 // ─── Meal Form ────────────────────────────────────────────────────────────────
 
-function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealType = 'Breakfast' }) {
-  const [form, setForm] = useState(initialData || { mealType: defaultMealType, title: '' });
+function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealType = 'Breakfast', foodGroups = [] }) {
+  const [form, setForm] = useState(initialData || { mealType: defaultMealType, title: '', tags: [] });
   const [aiLoading, setAiLoading] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState('');
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -162,9 +171,9 @@ function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealTy
     e.preventDefault();
     if (!form.title.trim()) return;
     if (editId) {
-      await db.meals.update(editId, { mealType: form.mealType, title: form.title.trim() });
+      await db.meals.update(editId, { mealType: form.mealType, title: form.title.trim(), tags: form.tags });
     } else {
-      await db.meals.add({ date: forDate, mealType: form.mealType, title: form.title.trim(), completed: false });
+      await db.meals.add({ date: forDate, mealType: form.mealType, title: form.title.trim(), completed: true, tags: form.tags });
     }
     onSave();
     onClose();
@@ -183,8 +192,15 @@ function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealTy
     setAiLoading(false);
   };
 
+  const toggleTag = (tag) => {
+    setForm(f => ({
+      ...f,
+      tags: f.tags?.includes(tag) ? f.tags.filter(t => t !== tag) : [...(f.tags || []), tag]
+    }));
+  };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-4 gap-2">
         {Object.entries(MEAL_CONFIG).map(([type, cfg]) => (
           <button key={type} type="button" onClick={() => set('mealType', type)}
@@ -211,105 +227,84 @@ function MealForm({ onSave, onClose, initialData, editId, forDate, defaultMealTy
           value={form.title} onChange={e => set('title', e.target.value)} required autoFocus />
       </div>
 
+      {foodGroups.length > 0 && (
+        <div className="space-y-2">
+          <label className="text-xs font-bold text-outline uppercase tracking-wider">Tags (Food Groups)</label>
+          <div className="flex flex-wrap gap-2">
+            {foodGroups.map(tag => {
+              const isSelected = form.tags?.includes(tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => toggleTag(tag)}
+                  className={cn(
+                    'text-[11px] font-bold px-3 py-1.5 rounded-full transition-all border',
+                    isSelected ? 'bg-primary/20 text-primary border-primary/30' : 'bg-surface-container text-outline-variant border-transparent hover:bg-surface-container-high'
+                  )}
+                >
+                  {isSelected && <Icon name="check" size={12} className="inline mr-1" />}
+                  {tag}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       <button type="submit" className="btn-primary w-full py-4 font-bold shadow-gradient">
-        {editId ? 'Save Changes' : 'Add Meal'}
+        {editId ? 'Save Changes' : 'Save Meal'}
       </button>
     </form>
   );
 }
 
-// ─── Nutrition Check Card ─────────────────────────────────────────────────────
+function TagManagerSheet({ foodGroups, onRefresh }) {
+  const [newTag, setNewTag] = useState('');
 
-function NutritionCard({ category, checked, onCheck }) {
-  const c = color(category.colorKey);
-  const foods = category.userFoods || category.examples;
+  const handleAdd = async () => {
+    if (!newTag.trim() || foodGroups.includes(newTag.trim())) return;
+    const updated = [...foodGroups, newTag.trim()];
+    await db.settings.put({ key: 'foodGroups', value: updated });
+    setNewTag('');
+    onRefresh();
+  };
 
-  return (
-    <button
-      onClick={onCheck}
-      className={cn(
-        'w-full text-left rounded-2xl p-4 flex items-center gap-4 transition-all duration-200 active:scale-[0.98]',
-        checked ? 'bg-surface-container border border-outline-variant/20' : 'bg-surface-container-lowest shadow-card border border-transparent'
-      )}
-    >
-      <div className={cn('w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0', checked ? 'bg-secondary/20' : c.bg)}>
-        {checked ? <Icon name="check_circle" size={22} filled className="text-secondary" /> : <Icon name="nutrition" size={22} className={c.text} />}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <p className={cn('font-semibold text-sm text-on-surface', checked && 'line-through text-outline')}>{category.name}</p>
-          <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full', checked ? 'bg-secondary/10 text-secondary' : `${c.bg} ${c.text}`)}>
-            {FREQ_LABELS[category.userFrequency || category.frequency]}
-          </span>
-        </div>
-        <p className="text-xs text-outline truncate">{foods}</p>
-      </div>
-      <div className={cn('w-6 h-6 rounded-full border-2 flex-shrink-0 flex items-center justify-center flex-shrink-0', checked ? 'bg-secondary border-secondary' : 'border-outline-variant')}>
-        {checked && <Icon name="check" size={13} className="text-white" />}
-      </div>
-    </button>
-  );
-}
-
-// ─── Manage Categories Sheet ──────────────────────────────────────────────────
-
-function ManageCategoriesSheet({ categories, onRefresh }) {
-  const [editTarget, setEditTarget] = useState(null);
-  const handleToggle = async (cat) => {
-    await db.nutritionCategories.update(cat.id, { active: cat.active ? 0 : 1 });
+  const handleRemove = async (tag) => {
+    const updated = foodGroups.filter(t => t !== tag);
+    await db.settings.put({ key: 'foodGroups', value: updated });
     onRefresh();
   };
 
   return (
-    <div className="space-y-3">
-      {categories.map(cat => (
-        <div key={cat.id} className="flex items-center gap-3 p-3 rounded-2xl bg-surface-container border border-outline-variant/10">
-          <div className="flex-1 min-w-0">
-            <p className={cn('text-sm font-semibold text-on-surface', !cat.active && 'text-outline line-through')}>{cat.name}</p>
-            <p className="text-[10px] text-outline">{FREQ_LABELS[cat.userFrequency || cat.frequency]}</p>
-          </div>
-          <button onClick={() => setEditTarget(cat)} className="text-outline-variant hover:text-primary p-1.5"><Icon name="edit" size={16} /></button>
-          <button onClick={() => handleToggle(cat)} className={cn('text-xs font-bold px-3 py-1.5 rounded-full', cat.active ? 'bg-secondary/10 text-secondary' : 'bg-surface-container-high text-outline')}>
-            {cat.active ? 'On' : 'Off'}
-          </button>
-        </div>
-      ))}
-      <BottomSheet isOpen={!!editTarget} onClose={() => setEditTarget(null)} title={`Edit · ${editTarget?.name}`} zIndex={200}>
-        <EditCategorySheet category={editTarget} onSave={onRefresh} onClose={() => setEditTarget(null)} />
-      </BottomSheet>
-    </div>
-  );
-}
-
-function EditCategorySheet({ category, onSave, onClose }) {
-  const [userFoods, setUserFoods] = useState(category?.userFoods || '');
-  const [userFrequency, setUserFrequency] = useState(category?.userFrequency || category?.frequency || 'daily');
-  const handleSave = async () => {
-    await db.nutritionCategories.update(category.id, { userFoods, userFrequency });
-    onSave();
-    onClose();
-  };
-  return (
-    <div className="space-y-5">
-      <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10">
-        <p className="text-xs font-bold text-primary mb-1">Why this matters</p>
-        <p className="text-xs text-outline leading-relaxed">{category.why}</p>
+    <div className="space-y-4">
+      <div className="bg-primary/5 rounded-2xl p-4 border border-primary/10 mb-2">
+        <p className="text-xs font-bold text-primary mb-1">Custom Food Groups</p>
+        <p className="text-xs text-outline leading-relaxed">
+          Add tags like "Protein", "Fiber", or "Water" to track alongside your meals.
+        </p>
       </div>
-      <div>
-        <label className="text-xs font-bold text-outline uppercase tracking-wider block mb-1.5">My Preferences</label>
-        <textarea className="input-pill w-full text-sm resize-none" rows={2} placeholder={category.examples} value={userFoods} onChange={e => setUserFoods(e.target.value)} />
-      </div>
-      <div>
-        <label className="text-xs font-bold text-outline uppercase tracking-wider block mb-2">Target Frequency</label>
-        <div className="grid grid-cols-3 gap-2">
-          {FREQ_OPTIONS.map(f => (
-            <button key={f} onClick={() => setUserFrequency(f)} className={cn('py-2.5 rounded-full text-xs font-bold transition-all', userFrequency === f ? 'bg-primary text-white shadow-gradient' : 'bg-surface-container text-outline')}>
-              {FREQ_LABELS[f]}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {foodGroups.map(tag => (
+          <div key={tag} className="flex items-center gap-2 bg-surface-container text-on-surface text-[11px] font-bold px-3 py-1.5 rounded-full border border-outline-variant/20">
+            {tag}
+            <button onClick={() => handleRemove(tag)} className="text-outline-variant hover:text-error transition-colors">
+              <Icon name="close" size={14} />
             </button>
-          ))}
-        </div>
+          </div>
+        ))}
+        {foodGroups.length === 0 && (
+          <p className="text-xs text-outline italic">No custom food groups created yet.</p>
+        )}
       </div>
-      <button onClick={handleSave} className="btn-primary w-full py-4 font-bold">Save Changes</button>
+      <div className="flex gap-2">
+        <input className="input-pill flex-1 text-sm py-3 px-4 shadow-inner" placeholder="e.g. Greens, Protein..."
+          value={newTag} onChange={e => setNewTag(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAdd()} />
+        <button onClick={handleAdd} className="bg-primary text-white p-3 rounded-full shadow-gradient">
+          <Icon name="add" size={20} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -317,9 +312,7 @@ function EditCategorySheet({ category, onSave, onClose }) {
 // ─── Main Tab ─────────────────────────────────────────────────────────────────
 
 export default function NutritionTab() {
-  const [categories, setCategories] = useState([]);
-  const [scheduleMap, setScheduleMap] = useState({});
-  const [logs, setLogs] = useState(new Set());
+  const [foodGroups, setFoodGroups] = useState([]);
   const [weekDates, setWeekDates] = useState([]);
   const [selectedDay, setSelectedDay] = useState(getTodayStr());
 
@@ -339,39 +332,24 @@ export default function NutritionTab() {
   const loadAll = useCallback(async () => {
     setLoading(true);
     await seedTodayData();
-    await generateWeeklySchedule(weekStart);
 
-    const [cats, sch, ml, groceries] = await Promise.all([
-      db.nutritionCategories.orderBy('order').toArray(),
-      db.weeklySchedule.where('weekStart').equals(weekStart).toArray(),
+    const [fg, ml, groceries] = await Promise.all([
+      db.settings.get('foodGroups'),
       db.meals.where('date').equals(selectedDay).toArray(),
       db.groceryItems.where('weekStart').equals(weekStart).toArray()
     ]);
 
-    setCategories(cats);
+    setFoodGroups(fg?.value || []);
     setWeekDates(getWeekDates(today));
     setMeals(ml.sort((a, b) => (MEAL_ORDER[a.mealType] || 0) - (MEAL_ORDER[b.mealType] || 0)));
     setGroceryItems(groceries);
 
-    const sm = {};
-    sch.forEach(r => sm[r.categoryId] = r.assignedDays || []);
-    setScheduleMap(sm);
-
-    const dayLogs = await db.nutritionLogs.where('date').equals(selectedDay).toArray();
-    setLogs(new Set(dayLogs.map(l => l.categoryId)));
     setLoading(false);
   }, [selectedDay, weekStart, today]);
 
   useEffect(() => { loadAll(); }, [loadAll]);
 
-  const handleNutritionToggle = async (catId) => {
-    if (logs.has(catId)) {
-      await db.nutritionLogs.where({ date: selectedDay, categoryId: catId }).delete();
-    } else {
-      await db.nutritionLogs.add({ date: selectedDay, categoryId: catId });
-    }
-    loadAll();
-  };
+  useEffect(() => { loadAll(); }, [loadAll]);
 
   const handleMealToggle = async (meal) => {
     await db.meals.update(meal.id, { completed: !meal.completed });
@@ -397,13 +375,13 @@ export default function NutritionTab() {
   };
 
   // Stats
-  const selectedDayIdx = getTodayWeekIndex(selectedDay);
-  const assignedCats = categories.filter(c => c.active && (scheduleMap[c.id] || []).includes(selectedDayIdx));
-  const checkedCount = assignedCats.filter(c => logs.has(c.id)).length;
-  const nutritionPct = assignedCats.length ? Math.round((checkedCount / assignedCats.length) * 100) : 0;
-  const mustCats  = assignedCats.filter(c => c.priority === 'must');
-  const mustTotal = mustCats.length;
-  const mustDone  = mustCats.filter(c => logs.has(c.id)).length;
+  const targetGroupsCount = foodGroups.length;
+  // Get all unique tags from completed meals today
+  const completedTags = new Set();
+  meals.filter(m => m.completed && m.tags).forEach(m => {
+    m.tags.forEach(t => completedTags.add(t));
+  });
+  const completedTagsCount = completedTags.size;
   const groceryPending = groceryItems.filter(g => !g.checked).length;
 
   return (
@@ -445,7 +423,7 @@ export default function NutritionTab() {
 
         {/* Calorie Ring + Quick Add */}
         <section className="card-floating p-5 space-y-4">
-          <EssentialsRing done={mustDone} total={mustTotal} />
+          <EssentialsRing done={completedTagsCount} total={targetGroupsCount} />
           <div className="border-t border-outline-variant/20 pt-4">
             <p className="text-[10px] font-black text-outline uppercase tracking-widest mb-2">Quick Add Meal</p>
             <MealTypeGrid
@@ -485,28 +463,6 @@ export default function NutritionTab() {
             )}
           </div>
         </section>
-
-        {/* Food Group Checklist */}
-        <section>
-          <div className="flex items-center justify-between mb-3 px-1">
-            <p className="text-xs font-bold uppercase tracking-widest text-outline-variant">Food Groups</p>
-            <span className={cn('text-[10px] font-black px-2.5 py-1 rounded-full',
-              nutritionPct === 100 ? 'bg-secondary/10 text-secondary' : 'bg-primary/10 text-primary')}>
-              {checkedCount}/{assignedCats.length} done
-            </span>
-          </div>
-          {assignedCats.length === 0 ? (
-            <div className="p-6 text-center bg-surface-container-lowest rounded-2xl border border-dashed border-outline-variant/30">
-              <p className="text-xs text-outline">No food groups scheduled for today</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {assignedCats.map(cat => (
-                <NutritionCard key={cat.id} category={cat} checked={logs.has(cat.id)} onCheck={() => handleNutritionToggle(cat.id)} />
-              ))}
-            </div>
-          )}
-        </section>
       </div>
 
       {/* Meal Form Sheet */}
@@ -518,16 +474,17 @@ export default function NutritionTab() {
         <MealForm
           onSave={loadAll}
           onClose={() => { setShowMealForm(false); setEditMeal(null); }}
-          initialData={editMeal ? { mealType: editMeal.mealType, title: editMeal.title } : null}
+          initialData={editMeal ? { mealType: editMeal.mealType, title: editMeal.title, tags: editMeal.tags || [] } : null}
           editId={editMeal?.id}
           forDate={selectedDay}
           defaultMealType={mealFormType}
+          foodGroups={foodGroups}
         />
       </BottomSheet>
 
       {/* Manage Food Groups Sheet */}
-      <BottomSheet isOpen={showManage} onClose={() => setShowManage(false)} title="Fuel Sources">
-        <ManageCategoriesSheet categories={categories} onRefresh={loadAll} onClose={() => setShowManage(false)} />
+      <BottomSheet isOpen={showManage} onClose={() => setShowManage(false)} title="Manage Food Tags">
+        <TagManagerSheet foodGroups={foodGroups} onRefresh={loadAll} />
       </BottomSheet>
 
       {/* Grocery Sheet */}

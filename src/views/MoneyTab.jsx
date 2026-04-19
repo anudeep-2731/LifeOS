@@ -4,11 +4,12 @@ import BottomSheet from '../components/ui/BottomSheet';
 import SmartImportSheet from '../components/ui/SmartImportSheet';
 import FinanceSettingsSheet from '../components/ui/FinanceSettingsSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, getMonthStr, seedTodayData } from '../db/database';
-import { CATEGORY_CONFIG, EMPTY_FORM } from '../lib/constants';
+import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials } from '../db/database';
+import { DEFAULT_CATEGORY, EMPTY_FORM } from '../lib/constants';
+import { downloadCSV } from '../lib/ExportUtils';
 
-function CategoryIcon({ category }) {
-  const cfg = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.Other;
+function CategoryIcon({ category, config }) {
+  const cfg = config?.find(c => c.name === category) || { icon: 'more_horiz', color: 'text-outline', bg: 'bg-surface-container' };
   return (
     <div className={cn('w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0', cfg.bg)}>
       <Icon name={cfg.icon} size={22} className={cfg.color} />
@@ -16,13 +17,16 @@ function CategoryIcon({ category }) {
   );
 }
 
-function ExpenseRow({ expense, onDelete, onEdit }) {
+function ExpenseRow({ expense, onDelete, onEdit, categories }) {
+  const today = getTodayStr();
+  const dateDisplay = expense.date === today ? 'Today' : expense.date;
+
   return (
     <div className="bg-surface-container-lowest rounded-2xl p-4 flex items-center gap-4 shadow-card">
-      <CategoryIcon category={expense.category} />
+      <CategoryIcon category={expense.category} config={categories} />
       <div className="flex-1 min-w-0">
         <p className="font-semibold text-sm text-on-surface truncate">{expense.description}</p>
-        <p className="text-xs text-outline mt-0.5">{expense.category} &bull; {expense.timestamp}</p>
+        <p className="text-xs text-outline mt-0.5">{expense.category} &bull; {dateDisplay} {expense.timestamp}</p>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0">
         <span className="font-headline font-bold text-tertiary text-sm">
@@ -39,27 +43,31 @@ function ExpenseRow({ expense, onDelete, onEdit }) {
   );
 }
 
-function ExpenseForm({ onSave, onClose, initialData, editId }) {
-  const [form, setForm] = useState(initialData || EMPTY_FORM);
+function ExpenseForm({ onSave, onClose, initialData, editId, categories = [] }) {
+  const [form, setForm] = useState(initialData || { ...EMPTY_FORM, date: getTodayStr() });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.description.trim() || !form.amount) return;
+    
+    const amount = Number(form.amount);
+    const date = form.date || getTodayStr();
+    
     if (editId) {
       await db.expenses.update(editId, {
-        amount: Number(form.amount),
+        amount,
         category: form.category,
         description: form.description.trim(),
+        date,
       });
     } else {
-      const today = getTodayStr();
       const now   = new Date();
       const timestamp = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
       await db.expenses.add({
-        date: today,
+        date,
         timestamp,
-        amount: Number(form.amount),
+        amount,
         category: form.category,
         description: form.description.trim(),
       });
@@ -69,38 +77,41 @@ function ExpenseForm({ onSave, onClose, initialData, editId }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {editId && initialData?.date && (
-        <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] font-bold text-outline uppercase tracking-wider">Transaction date:</span>
-          <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full">{initialData.date}</span>
+    <form onSubmit={handleSubmit} className="space-y-4 pb-4">
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Date</label>
+          <input type="date" className="input-pill w-full text-sm" 
+            value={form.date} onChange={e => set('date', e.target.value)} required />
         </div>
-      )}
+        <div>
+          <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Amount (₹)</label>
+          <input type="number" min="0" step="any" className="input-pill w-full text-sm font-bold text-primary" placeholder="e.g. 450"
+            value={form.amount} onChange={e => set('amount', e.target.value)} required />
+        </div>
+      </div>
+      
       <div>
         <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Description</label>
         <input className="input-pill w-full text-sm" placeholder="e.g. Coffee & Sandwich"
-          value={form.description} onChange={e => set('description', e.target.value)} required autoFocus />
+          value={form.description} onChange={e => set('description', e.target.value)} required />
       </div>
-      <div>
-        <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Amount (₹)</label>
-        <input type="number" min="1" step="1" className="input-pill w-full text-sm" placeholder="e.g. 450"
-          value={form.amount} onChange={e => set('amount', e.target.value)} required />
-      </div>
+
       <div>
         <label className="text-xs font-semibold text-outline uppercase tracking-wider block mb-1.5">Category</label>
         <div className="grid grid-cols-4 gap-2">
-          {Object.keys(CATEGORY_CONFIG).map(cat => {
-            const cfg = CATEGORY_CONFIG[cat];
+          {categories.map(cat => {
             return (
-              <button key={cat} type="button" onClick={() => set('category', cat)}
+              <button key={cat.name} type="button" onClick={() => set('category', cat.name)}
                 className={cn('flex flex-col items-center gap-1 py-3 rounded-2xl text-[10px] font-semibold transition-all active:scale-95',
-                  form.category === cat ? 'bg-primary text-white' : 'bg-surface-container text-outline hover:bg-surface-container-high')}>
-                <Icon name={cfg.icon} size={18} />{cat}
+                  form.category === cat.name ? 'bg-primary text-white' : 'bg-surface-container text-outline hover:bg-surface-container-high')}>
+                <Icon name={cat.icon} size={18} />{cat.name}
               </button>
             );
           })}
         </div>
       </div>
+
       {editId && initialData?.emailBody && (
         <details className="text-xs">
           <summary className="cursor-pointer text-outline font-semibold select-none flex items-center gap-1.5 px-1">
@@ -113,23 +124,30 @@ function ExpenseForm({ onSave, onClose, initialData, editId }) {
           </div>
         </details>
       )}
-      <button type="submit" className="btn-primary w-full text-center">
+
+      <button type="submit" className="btn-primary w-full py-4 mt-2">
         {editId ? 'Save Changes' : 'Add Expense'}
       </button>
     </form>
   );
 }
 
-function InvestmentInput({ category, date, onSave, defaultValue = 0 }) {
+function MonthlyItemInput({ type, category, date, onSave, defaultValue = 0, colorClass = 'text-primary', bgClass = 'bg-primary/5', borderClass = 'border-primary/20', hideAmount = false }) {
   const [val, setVal] = useState(defaultValue);
   const [editing, setEditing] = useState(false);
 
+  // Sync with defaultValue when it changes (e.g. month navigation)
+  useEffect(() => {
+    setVal(defaultValue);
+  }, [defaultValue]);
+
   const save = async () => {
-    const existing = await db.investments.where({ month: date, category }).first();
+    const table = type === 'investment' ? 'investments' : type === 'income' ? 'income' : 'emis';
+    const existing = await db[table].where({ month: date, category }).first();
     if (existing) {
-      await db.investments.update(existing.id, { amount: Number(val) });
+      await db[table].update(existing.id, { amount: Number(val) });
     } else {
-      await db.investments.add({ month: date, category, amount: Number(val) });
+      await db[table].add({ month: date, category, amount: Number(val) });
     }
     setEditing(false);
     onSave();
@@ -146,19 +164,21 @@ function InvestmentInput({ category, date, onSave, defaultValue = 0 }) {
 
   if (editing) {
     return (
-      <div className="flex items-center gap-2 w-full p-2 rounded-2xl bg-primary/5 border border-primary/20">
-        <input type="number" autoFocus className="bg-transparent w-full text-sm font-bold text-primary focus:outline-none px-2"
+      <div className={cn("flex items-center gap-2 w-full p-2 rounded-2xl border", bgClass, borderClass)}>
+        <input type="number" autoFocus className={cn("bg-transparent w-full text-sm font-bold focus:outline-none px-2", colorClass)}
           value={val} onChange={e => setVal(e.target.value)}
           onBlur={save} onKeyDown={e => e.key === 'Enter' && save()} />
-        <button onClick={save} className="text-primary p-1"><Icon name="check" size={18} /></button>
+        <button onClick={save} className={colorClass}><Icon name="check" size={18} /></button>
       </div>
     );
   }
 
   return (
-    <button onClick={() => setEditing(true)} className="flex items-center justify-between w-full p-3 rounded-2xl bg-secondary/10 border border-secondary/20 transition-all">
-      <span className="text-xs font-bold text-secondary">{category}</span>
-      <span className="text-sm font-headline font-bold text-secondary">₹{val.toLocaleString()}</span>
+    <button onClick={() => setEditing(true)} className={cn("flex items-center justify-between w-full p-3 rounded-2xl border transition-all", bgClass, borderClass)}>
+      <span className={cn("text-xs font-bold", colorClass)}>{category}</span>
+      <span className={cn("text-sm font-headline font-bold", colorClass)}>
+        {hideAmount ? '₹••••' : `₹${val.toLocaleString()}`}
+      </span>
     </button>
   );
 }
@@ -179,23 +199,57 @@ export default function MoneyTab() {
   const [nlInput, setNlInput] = useState('');
   const [isNlProcessing, setIsNlProcessing] = useState(false);
 
+  const [categories, setCategories] = useState([]);
+  const [income, setIncome] = useState([]);
+  const [emis, setEmis] = useState([]);
+  const [incomeCats, setIncomeCats] = useState([]);
+  const [emiCats, setEmiCats] = useState([]);
+
+  // Privacy & Collapse State
+  const [isPrivate, setIsPrivate] = useState(true);
+  const [incomeCollapsed, setIncomeCollapsed] = useState(true);
+  const [emiCollapsed, setEmiCollapsed] = useState(true);
+  const [investmentsCollapsed, setInvestmentsCollapsed] = useState(true);
+
   const today = getTodayStr();
 
   const loadData = async () => {
     setLoading(true);
-    const b  = await db.settings.get('monthlyBudget');
-    const c  = await db.settings.get('investmentCategories');
-    const cb = await db.settings.get('categoryBudgets');
+    
+    // Ensure seeds and rollover
+    await seedTodayData();
+    await rolloverFinancials(selectedMonth);
+
+    const [b, c, cb, ec, ic, mc] = await Promise.all([
+      db.settings.get('monthlyBudget'),
+      db.settings.get('investmentCategories'),
+      db.settings.get('categoryBudgets'),
+      db.settings.get('expenseCategories'),
+      db.settings.get('incomeCategories'),
+      db.settings.get('emiCategories'),
+    ]);
+
     if (b)  setBudget(b.value);
     if (c)  setInvestCats(c.value);
     if (cb) setCategoryBudgets(cb.value);
+    if (ec) setCategories(ec.value);
+    if (ic) setIncomeCats(ic.value);
+    if (mc) setEmiCats(mc.value);
 
-    const monthExpenses = await db.expenses.filter(e => e.date.startsWith(selectedMonth)).toArray();
+    // Load monthly data
+    const [monthExpenses, currentInvests, currentIncome, currentEmis] = await Promise.all([
+      db.expenses.filter(e => e.date.startsWith(selectedMonth)).toArray(),
+      db.investments.where('month').equals(selectedMonth).toArray(),
+      db.income.where('month').equals(selectedMonth).toArray(),
+      db.emis.where('month').equals(selectedMonth).toArray(),
+    ]);
+
     monthExpenses.sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+    
     setExpenses(monthExpenses);
-
-    const currentInvests = await db.investments.where('month').equals(selectedMonth).toArray();
     setInvestments(currentInvests);
+    setIncome(currentIncome);
+    setEmis(currentEmis);
 
     setLoading(false);
   };
@@ -225,7 +279,7 @@ export default function MoneyTab() {
           timestamp,
           amount,
           description,
-          category: 'Other', // Could improve with a simple keyword map
+          category: DEFAULT_CATEGORY, // Use default from constants
         });
         setNlInput('');
         loadData();
@@ -254,11 +308,20 @@ export default function MoneyTab() {
     loadData();
   };
 
+  const totalIncome = income.reduce((s, i) => s + i.amount, 0);
+  const totalInvest = investments.reduce((s, i) => s + i.amount, 0);
+  const totalEmis   = emis.reduce((s, i) => s + i.amount, 0);
+  const monthSpent  = expenses.reduce((s, e) => s + e.amount, 0);
+  const totalDebits = monthSpent + totalInvest + totalEmis;
+  const netBalance  = totalIncome - totalDebits;
+
   const todaySpent = expenses.filter(e => e.date === today).reduce((s, e) => s + e.amount, 0);
-  const monthSpent = expenses.reduce((s, e) => s + e.amount, 0);
   const remaining  = budget - monthSpent;
   const pct        = Math.min((monthSpent / budget) * 100, 100);
   const barColor   = pct > 90 ? 'bg-error' : pct > 70 ? 'bg-tertiary' : 'bg-primary';
+
+  const healthPct  = totalIncome > 0 ? Math.max(0, Math.min((netBalance / totalIncome) * 100, 100)) : 0;
+  const healthColor = netBalance < 0 ? 'text-error' : netBalance < totalIncome * 0.1 ? 'text-tertiary' : 'text-primary';
 
   const now = new Date();
   const [selYear, selMonth0] = selectedMonth.split('-').map(Number);
@@ -273,6 +336,16 @@ export default function MoneyTab() {
       return acc;
     }, {});
   }, [expenses]);
+
+  const handleExport = () => {
+    const data = [
+      ...expenses.map(e => ({ type: 'Expense', date: e.date, category: e.category, description: e.description, amount: e.amount })),
+      ...income.map(i => ({ type: 'Income', date: selectedMonth, category: i.category, description: 'Monthly Income', amount: i.amount })),
+      ...investments.map(i => ({ type: 'Investment', date: selectedMonth, category: i.category, description: 'Monthly Investment', amount: i.amount })),
+      ...emis.map(e => ({ type: 'EMI', date: selectedMonth, category: e.category, description: 'Monthly EMI', amount: e.amount })),
+    ];
+    downloadCSV(`finance_report_${selectedMonth}.csv`, data);
+  };
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -292,6 +365,10 @@ export default function MoneyTab() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={handleExport}
+              className="flex items-center gap-1.5 bg-surface-container text-outline-variant text-xs font-semibold rounded-full px-3 py-2 hover:bg-surface-container-high transition-all active:scale-95">
+              <Icon name="download" size={14} />
+            </button>
             <button onClick={() => setShowSettings(true)}
               className="flex items-center gap-1.5 bg-surface-container text-outline-variant text-xs font-semibold rounded-full px-3 py-2 hover:bg-surface-container-high transition-all active:scale-95">
               <Icon name="tune" size={14} />
@@ -305,13 +382,34 @@ export default function MoneyTab() {
         </div>
       </div>
 
-      {/* Monthly overview card */}
-      <div className="mx-4 mt-2 card-floating overflow-hidden">
+      {/* Monthly Health Overview */}
+      <div className="mx-4 mt-2 grid grid-cols-2 gap-3">
+        <div className="card-floating p-4 bg-primary/5 border-primary/10 relative group">
+          <div className="flex justify-between items-start mb-1">
+            <p className="text-[10px] text-outline uppercase font-bold tracking-wider">Total Income</p>
+            <button onClick={() => setIsPrivate(!isPrivate)} className="text-outline-variant hover:text-primary transition-colors">
+              <Icon name={isPrivate ? "visibility_off" : "visibility"} size={14} />
+            </button>
+          </div>
+          <p className="text-xl font-headline font-extrabold text-primary">
+            {isPrivate ? '₹••••' : `₹${totalIncome.toLocaleString()}`}
+          </p>
+        </div>
+        <div className="card-floating p-4 bg-tertiary/5 border-tertiary/10">
+          <p className="text-[10px] text-outline uppercase font-bold tracking-wider mb-1">Net Balance</p>
+          <p className={cn("text-xl font-headline font-extrabold", healthColor)}>
+            {isPrivate ? '₹••••' : `₹${netBalance.toLocaleString()}`}
+          </p>
+        </div>
+      </div>
+
+      {/* Monthly spending progress bar card */}
+      <div className="mx-4 mt-4 card-floating overflow-hidden">
         <div className="p-6">
           <div className="flex justify-between items-start mb-2">
             <div>
-              <p className="text-xs text-outline uppercase tracking-wider mb-1">Month Spending</p>
-              <p className="text-4xl font-headline font-extrabold text-primary leading-tight">
+              <p className="text-xs text-outline uppercase tracking-wider mb-1">Expense Budget</p>
+              <p className="text-4xl font-headline font-extrabold text-on-surface leading-tight">
                 &#8377;{monthSpent.toLocaleString()}
               </p>
             </div>
@@ -338,19 +436,75 @@ export default function MoneyTab() {
         </div>
       </div>
 
-      {/* Investments Section */}
-      <div className="mx-4 mt-6">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly Investments</span>
+      {/* Monthly Sections (Income, EMIs, Investments) */}
+      <div className="mx-4 mt-6 space-y-6">
+        {/* Income */}
+        <div>
+          <button onClick={() => setIncomeCollapsed(!incomeCollapsed)} className="flex items-center justify-between w-full mb-3 px-1 hover:bg-surface-container-highest/20 rounded-lg transition-all py-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly Income</span>
+              <Icon name={incomeCollapsed ? "expand_more" : "expand_less"} size={16} className="text-outline-variant" />
+            </div>
+            <span className="text-xs font-bold text-primary">
+              {isPrivate ? '₹••••' : `₹${totalIncome.toLocaleString()}`}
+            </span>
+          </button>
+          {!incomeCollapsed && (
+            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              {incomeCats.map(cat => {
+                const existing = income.find(i => i.category === cat);
+                return (
+                  <MonthlyItemInput key={`income-${cat}-${selectedMonth}`} type="income" category={cat} date={selectedMonth}
+                    defaultValue={existing?.amount || 0} onSave={loadData} colorClass="text-primary" bgClass="bg-primary/5" borderClass="border-primary/20"
+                    hideAmount={isPrivate} />
+                );
+              })}
+            </div>
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {investCats.map(cat => {
-            const existing = investments.find(inv => inv.category === cat);
-            return (
-              <InvestmentInput key={`${cat}-${selectedMonth}`} category={cat} date={selectedMonth}
-                defaultValue={existing?.amount || 0} onSave={loadData} />
-            );
-          })}
+
+        {/* EMIs */}
+        <div>
+          <button onClick={() => setEmiCollapsed(!emiCollapsed)} className="flex items-center justify-between w-full mb-3 px-1 hover:bg-surface-container-highest/20 rounded-lg transition-all py-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly EMIs</span>
+              <Icon name={emiCollapsed ? "expand_more" : "expand_less"} size={16} className="text-outline-variant" />
+            </div>
+            <span className="text-xs font-bold text-error">₹{totalEmis.toLocaleString()}</span>
+          </button>
+          {!emiCollapsed && (
+            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              {emiCats.map(cat => {
+                const existing = emis.find(e => e.category === cat);
+                return (
+                  <MonthlyItemInput key={`emi-${cat}-${selectedMonth}`} type="emi" category={cat} date={selectedMonth}
+                    defaultValue={existing?.amount || 0} onSave={loadData} colorClass="text-error" bgClass="bg-error/5" borderClass="border-error/20" />
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Investments */}
+        <div>
+          <button onClick={() => setInvestmentsCollapsed(!investmentsCollapsed)} className="flex items-center justify-between w-full mb-3 px-1 hover:bg-surface-container-highest/20 rounded-lg transition-all py-1">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly Investments</span>
+              <Icon name={investmentsCollapsed ? "expand_more" : "expand_less"} size={16} className="text-outline-variant" />
+            </div>
+            <span className="text-xs font-bold text-secondary">₹{totalInvest.toLocaleString()}</span>
+          </button>
+          {!investmentsCollapsed && (
+            <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
+              {investCats.map(cat => {
+                const existing = investments.find(inv => inv.category === cat);
+                return (
+                  <MonthlyItemInput key={`invest-${cat}-${selectedMonth}`} type="investment" category={cat} date={selectedMonth}
+                    defaultValue={existing?.amount || 0} onSave={loadData} colorClass="text-secondary" bgClass="bg-secondary/5" borderClass="border-secondary/20" />
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -367,7 +521,7 @@ export default function MoneyTab() {
               const catBudget = categoryBudgets[cat] || 0;
               const catPct    = catBudget > 0 ? Math.min((spent / catBudget) * 100, 100) : 0;
               const catColor  = catPct > 90 ? 'bg-error' : catPct > 70 ? 'bg-tertiary' : 'bg-primary';
-              const cfg       = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG.Other;
+              const cfg       = categories.find(c => c.name === cat) || { icon: 'more_horiz', color: 'text-outline', bg: 'bg-surface-container' };
               return (
                 <div key={cat} className="card-floating p-4">
                   <div className="flex items-center justify-between mb-2">
@@ -438,7 +592,7 @@ export default function MoneyTab() {
 
         <div className="space-y-3">
           {expenses.map(e => (
-            <ExpenseRow key={e.id} expense={e}
+            <ExpenseRow key={e.id} expense={e} categories={categories}
               onDelete={() => handleDelete(e)}
               onEdit={() => setEditExpense(e)}
             />
@@ -462,12 +616,13 @@ export default function MoneyTab() {
 
       {/* Sheets */}
       <BottomSheet isOpen={showForm} onClose={() => setShowForm(false)} title="Add Expense">
-        <ExpenseForm onSave={loadData} onClose={() => setShowForm(false)} />
+        <ExpenseForm onSave={loadData} onClose={() => setShowForm(false)} categories={categories} />
       </BottomSheet>
 
       <BottomSheet isOpen={!!editExpense} onClose={() => setEditExpense(null)} title="Edit Expense">
         {editExpense && (
           <ExpenseForm
+            categories={categories}
             initialData={{ description: editExpense.description, amount: editExpense.amount, category: editExpense.category, date: editExpense.date, emailBody: editExpense.emailBody }}
             editId={editExpense.id}
             onSave={loadData}
