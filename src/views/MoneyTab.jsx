@@ -181,8 +181,8 @@ function MonthlyItemInput({ type, category, date, onSave, defaultValue = 0, colo
   if (!editing && val === 0) {
     return (
       <button onClick={() => setEditing(true)} className="flex items-center justify-between w-full p-3 rounded-2xl bg-surface-container hover:bg-surface-container-high transition-all">
-        <span className="text-xs text-outline">{category}</span>
-        <Icon name="add" size={16} className="text-outline" />
+        <span className="text-xs text-outline truncate mr-2">{category}</span>
+        <Icon name="add" size={16} className="text-outline flex-shrink-0" />
       </button>
     );
   }
@@ -200,8 +200,8 @@ function MonthlyItemInput({ type, category, date, onSave, defaultValue = 0, colo
 
   return (
     <button onClick={() => setEditing(true)} className={cn("flex items-center justify-between w-full p-3 rounded-2xl border transition-all", bgClass, borderClass)}>
-      <span className={cn("text-xs font-bold", colorClass)}>{category}</span>
-      <span className={cn("text-sm font-headline font-bold", colorClass)}>
+      <span className={cn("text-xs font-bold truncate mr-2", colorClass)}>{category}</span>
+      <span className={cn("text-sm font-headline font-bold flex-shrink-0", colorClass)}>
         {hideAmount ? '₹••••' : `₹${val.toLocaleString()}`}
       </span>
     </button>
@@ -471,9 +471,9 @@ export default function MoneyTab() {
     <div className="flex flex-col min-h-screen">
 
       {/* Header */}
-      <div className="pt-6 px-6 pb-4 bg-surface-container-low">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-1">
+      <div className="pt-6 px-4 sm:px-6 pb-4 bg-surface-container-low">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+          <div className="flex items-center justify-between w-full sm:w-auto gap-1">
             <button
               onClick={() => {
                 const [y, m] = selectedMonth.split('-').map(Number);
