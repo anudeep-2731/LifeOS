@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, seedTodayData, rolloverRecurringTasks, giftXP, checkSynergyBonus } from '../db/database';
-import { prioritizeTasksWithAI, analyzeFlowWithAI, simplifyTaskWithAI } from '../lib/ai';
-import StatsHeader from '../components/ui/StatsHeader';
+import { db, getTodayStr, seedTodayData, rolloverRecurringTasks } from '../db/database';
+import { prioritizeTasksWithAI, simplifyTaskWithAI } from '../lib/ai';
 
 const PRIORITY_BORDER = {
   high:   'border-error',
@@ -76,11 +75,6 @@ function TaskCard({ task, onToggle, onDelete, onPostpone, onEdit }) {
                 {task.postponeCount}x postponed
               </span>
             )}
-          </div>
-          <div className="mt-2 flex items-center gap-1.5">
-             <span className="text-[10px] font-black text-primary/60 uppercase tracking-widest flex items-center gap-1">
-               <Icon name="bolt" size={10} /> +{task.priority === 'high' ? 150 : task.priority === 'medium' ? 100 : 50} XP
-             </span>
           </div>
         </div>
 
@@ -227,10 +221,7 @@ export default function TasksTab() {
   const [showAiSheet, setShowAiSheet] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [flowAnalysis, setFlowAnalysis] = useState(null);
-  const [showFlowSheet, setShowFlowSheet] = useState(false);
   const [simplifiedSteps, setSimplifiedSteps] = useState(null);
-  const [isSimplifying, setIsSimplifying] = useState(false);
   const today = getTodayStr();
 
   const loadTasks = async () => {
@@ -259,25 +250,7 @@ export default function TasksTab() {
   }, []);
 
   const handleToggle = async (task) => {
-    const isCompleting = !task.completed;
-    await db.tasks.update(task.id, { completed: isCompleting });
-    
-    if (isCompleting) {
-      // Award base XP
-      const baseXP = task.priority === 'high' ? 150 : task.priority === 'medium' ? 100 : 50;
-      let totalAwarded = baseXP;
-      let msg = `Completed: ${task.title}`;
-
-      // Check Synergy Bonus
-      const hasSynergy = await checkSynergyBonus();
-      if (hasSynergy) {
-        totalAwarded += 50;
-        msg += " + Synergy Bonus!";
-      }
-
-      await giftXP(totalAwarded, msg);
-    }
-    
+    await db.tasks.update(task.id, { completed: !task.completed });
     loadTasks();
   };
 
@@ -326,24 +299,11 @@ export default function TasksTab() {
     }
   };
 
-  const handleFlowAnalysis = async () => {
-    setAiLoading(true);
-    setShowFlowSheet(true);
-    const [routines] = await Promise.all([
-      db.routines.where('date').equals(today).toArray()
-    ]);
-    const analysis = await analyzeFlowWithAI(tasks, routines);
-    setFlowAnalysis(analysis);
-    setAiLoading(false);
-  };
-
   const handleSimplifyTask = async (task) => {
-    setIsSimplifying(true);
     setAiLoading(true);
     const steps = await simplifyTaskWithAI(task.title);
     setSimplifiedSteps({ title: task.title, steps });
     setAiLoading(false);
-    setIsSimplifying(false);
   };
 
   const handleAiPrioritize = async () => {
@@ -363,7 +323,6 @@ export default function TasksTab() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <StatsHeader />
       
       <div className="pt-4 px-6 pb-6 bg-surface-container-low">
         <div className="flex items-start justify-between">
@@ -372,10 +331,6 @@ export default function TasksTab() {
             <h1 className="text-2xl font-headline font-bold text-on-surface">Tasks</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={handleFlowAnalysis}
-              className="flex items-center gap-1.5 text-[10px] font-bold text-tertiary bg-tertiary/10 px-3 py-1.5 rounded-full active:scale-95 transition-all">
-              <Icon name="insights" size={12} /> Flow Analysis
-            </button>
             {(incompleteToday.length + carriedForward.length) >= 3 && (
               <button onClick={handleAiPrioritize}
                 className="flex items-center gap-1 text-[10px] font-bold text-primary bg-primary/10 px-3 py-1.5 rounded-full active:scale-95 transition-all">
@@ -508,28 +463,6 @@ export default function TasksTab() {
             Confirm Schedule
           </button>
         </div>
-      </BottomSheet>
-
-      {/* AI Flow Analysis Sheet */}
-      <BottomSheet isOpen={showFlowSheet} onClose={() => setShowFlowSheet(false)} title="Synergy Flow Analysis">
-        {aiLoading ? (
-           <div className="flex flex-col items-center justify-center py-10 gap-4">
-              <Icon name="sync" size={32} className="text-primary animate-spin" />
-              <p className="text-sm font-semibold text-outline">Architecting your day...</p>
-           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="primary-gradient/10 border border-primary/20 rounded-2xl p-4">
-               <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-2">Performance Intelligence</p>
-               <div className="prose prose-sm text-on-surface whitespace-pre-wrap leading-relaxed">
-                  {flowAnalysis || "No analysis available. Add more tasks and routines to get started."}
-               </div>
-            </div>
-            <button onClick={() => setShowFlowSheet(false)} className="btn-primary w-full py-4 uppercase font-black tracking-widest">
-               Got it
-            </button>
-          </div>
-        )}
       </BottomSheet>
 
       {/* Task Simplification (Atomic) Sheet */}

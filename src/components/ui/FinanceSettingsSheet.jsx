@@ -17,19 +17,21 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
   const [newEmi, setNewEmi] = useState('');
   
   const [categoryBudgets, setCategoryBudgets] = useState({});
+  const [budgetRules, setBudgetRules] = useState({ needs: 50, wants: 30, savings: 20 });
 
   useEffect(() => {
     if (isOpen) loadSettings();
   }, [isOpen]);
 
   const loadSettings = async () => {
-    const [b, ec, ic, inc, em, cb] = await Promise.all([
+    const [b, ec, ic, inc, em, cb, br] = await Promise.all([
       db.settings.get('monthlyBudget'),
       db.settings.get('expenseCategories'),
       db.settings.get('investmentCategories'),
       db.settings.get('incomeCategories'),
       db.settings.get('emiCategories'),
       db.settings.get('categoryBudgets'),
+      db.settings.get('budgetRules'),
     ]);
 
     if (b) setBudget(b.value);
@@ -38,6 +40,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
     if (inc) setIncomeCategories(inc.value || []);
     if (em) setEmiCategories(em.value || []);
     if (cb) setCategoryBudgets(cb.value || {});
+    if (br) setBudgetRules(br.value || { needs: 50, wants: 30, savings: 20 });
   };
 
   const handleSave = async () => {
@@ -48,6 +51,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
       db.settings.put({ key: 'incomeCategories', value: incomeCategories }),
       db.settings.put({ key: 'emiCategories', value: emiCategories }),
       db.settings.put({ key: 'categoryBudgets', value: categoryBudgets }),
+      db.settings.put({ key: 'budgetRules', value: budgetRules }),
     ]);
     window.dispatchEvent(new CustomEvent('life-os:settings-saved'));
     onSave();
@@ -60,7 +64,9 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
         name: newExp.trim(), 
         icon: 'payments', 
         color: 'text-primary', 
-        bg: 'bg-primary/10' 
+        bg: 'bg-primary/10',
+        type: 'Want',
+        defaultPaymentMode: 'UPI'
       }]);
       setNewExp('');
     }
@@ -77,18 +83,43 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
   const removeSimple = (list, setList, val) => setList(list.filter(l => l !== val));
   
   const setCatBudget = (cat, val) => setCategoryBudgets(prev => ({ ...prev, [cat]: Number(val) }));
+  
+  const updateCatField = (name, field, val) => {
+    setExpenseCategories(expenseCategories.map(c => c.name === name ? { ...c, [field]: val } : c));
+  };
 
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title="Finance Settings">
       <div className="space-y-8 pb-8">
 
-        {/* Monthly Budget */}
+        {/* Monthly Budget & Rules */}
         <section>
           <label className="text-[11px] font-bold text-outline uppercase tracking-wider block mb-2 ml-1">
             Monthly Expenses Budget (₹)
           </label>
-          <input type="number" className="input-pill w-full text-lg font-headline font-bold text-primary"
+          <input type="number" className="input-pill w-full text-lg font-headline font-bold text-primary mb-4"
             value={budget} onChange={e => setBudget(e.target.value)} />
+            
+          <label className="text-[11px] font-bold text-outline uppercase tracking-wider block mb-2 ml-1">
+            Budget Rules (%) - Needs / Wants / Savings
+          </label>
+          <div className="grid grid-cols-3 gap-2">
+            <div>
+              <span className="text-[10px] text-outline block ml-1 mb-1">Needs</span>
+              <input type="number" className="input-pill w-full text-sm font-bold text-center"
+                value={budgetRules.needs} onChange={e => setBudgetRules({...budgetRules, needs: Number(e.target.value)})} />
+            </div>
+            <div>
+              <span className="text-[10px] text-outline block ml-1 mb-1">Wants</span>
+              <input type="number" className="input-pill w-full text-sm font-bold text-center"
+                value={budgetRules.wants} onChange={e => setBudgetRules({...budgetRules, wants: Number(e.target.value)})} />
+            </div>
+            <div>
+              <span className="text-[10px] text-outline block ml-1 mb-1">Savings</span>
+              <input type="number" className="input-pill w-full text-sm font-bold text-center"
+                value={budgetRules.savings} onChange={e => setBudgetRules({...budgetRules, savings: Number(e.target.value)})} />
+            </div>
+          </div>
         </section>
 
         {/* Expense Categories & Budgets */}
@@ -98,22 +129,37 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
           </label>
           <div className="space-y-3 mb-4">
             {expenseCategories.map(cat => (
-              <div key={cat.name} className="flex items-center gap-3 p-3 rounded-2xl bg-surface-container-low border border-outline-variant/10">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${cat.bg}`}>
-                  <Icon name={cat.icon} size={15} className={cat.color} />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-on-surface truncate">{cat.name}</p>
-                </div>
+              <div key={cat.name} className="flex flex-col gap-2 p-3 rounded-2xl bg-surface-container-low border border-outline-variant/10">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-outline">₹</span>
-                    <input type="number" step="500" className="w-16 text-sm font-bold text-right bg-transparent focus:outline-none"
-                      value={categoryBudgets[cat.name] || 0} onChange={e => setCatBudget(cat.name, e.target.value)} />
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${cat.bg}`}>
+                    <Icon name={cat.icon} size={15} className={cat.color} />
                   </div>
-                  <button onClick={() => removeExp(cat.name)} className="text-outline-variant hover:text-error transition-colors">
-                    <Icon name="delete" size={16} />
-                  </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-on-surface truncate">{cat.name}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] text-outline">₹</span>
+                      <input type="number" step="500" className="w-16 text-sm font-bold text-right bg-transparent focus:outline-none"
+                        value={categoryBudgets[cat.name] || 0} onChange={e => setCatBudget(cat.name, e.target.value)} />
+                    </div>
+                    <button onClick={() => removeExp(cat.name)} className="text-outline-variant hover:text-error transition-colors">
+                      <Icon name="delete" size={16} />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex gap-2 mt-1">
+                  <select className="input-pill flex-1 text-[11px] py-1 px-2" value={cat.type || 'Want'} onChange={(e) => updateCatField(cat.name, 'type', e.target.value)}>
+                    <option value="Need">Need</option>
+                    <option value="Want">Want</option>
+                  </select>
+                  <select className="input-pill flex-1 text-[11px] py-1 px-2" value={cat.defaultPaymentMode || 'UPI'} onChange={(e) => updateCatField(cat.name, 'defaultPaymentMode', e.target.value)}>
+                    <option value="UPI">UPI</option>
+                    <option value="Credit Card">Credit Card</option>
+                    <option value="Debit Card">Debit Card</option>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                  </select>
                 </div>
               </div>
             ))}

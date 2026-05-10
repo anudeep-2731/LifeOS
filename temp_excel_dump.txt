@@ -1,0 +1,706 @@
+Sheets: Setup, Daily Expense Tracker, Weekly Analysis, Monthly Analysis, Yearly Calendar, Calc
+
+=== Setup ===
+[
+  [
+    "Year",
+    "Salary",
+    "Needs",
+    "Wants",
+    "Savings",
+    null,
+    "Enter current salary at B2.\nAssuming salary increases 10% per year. Update actuals every year\nThis follows the 50:30:20 rule. \n\nUse the 'Daily Expense Tracker' sheet to add all expense details.\nDouble click on a date row to select from calander.\n\nUpdate Category List and Payment Mode as needed. \nYou will also have to assign colours to new items. This would be a one time setup. \nGo to Daily Expense Tracker > select the respective dropdown > edit > asssign colors > assign to all\n\n\nFor any support please reach out to \nmayur.bhatolia@gmail.com\n@mayurbhatolia (instagram)"
+  ],
+  [
+    2026,
+    50000,
+    25000,
+    15000,
+    10000
+  ],
+  [
+    2027,
+    55000,
+    27500,
+    16500,
+    11000
+  ],
+  [
+    2028,
+    60500,
+    30250,
+    18150,
+    12100
+  ],
+  [
+    2029,
+    66550,
+    33275,
+    19965,
+    13310
+  ],
+  [
+    2030,
+    73205,
+    36602,
+    21961,
+    14641
+  ],
+  [],
+  [],
+  [],
+  [
+    "Category List",
+    "Type",
+    null,
+    "Payment Mode",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "All"
+  ],
+  [
+    "Life Infrastructure",
+    "Need",
+    null,
+    "Credit Card",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Credit Card"
+  ],
+  [
+    "Future Me",
+    "Saving",
+    null,
+    "Debit Card",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Debit Card"
+  ],
+  [
+    "Performance & Growth",
+    "Need",
+    null,
+    "UPI",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "UPI"
+  ],
+  [
+    "Relationships & Generosity",
+    "Want",
+    null,
+    "Cash",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Cash"
+  ],
+  [
+    "Lifestyle Enjoyment",
+    "Want",
+    null,
+    "Bank Transfer",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Bank Transfer"
+  ]
+]
+
+=== Daily Expense Tracker ===
+[
+  [
+    "Date",
+    "Description",
+    "Category",
+    "Amount",
+    "Payment Mode",
+    "Type",
+    "Notes"
+  ],
+  [
+    46023,
+    "Uber late night - NYE",
+    "Life Infrastructure",
+    450,
+    "UPI",
+    "Need",
+    "NYE cab home"
+  ],
+  [
+    46023,
+    "Brunch out with friends",
+    "Lifestyle Enjoyment",
+    950,
+    "Credit Card",
+    "Want",
+    "New year brunch"
+  ],
+  [
+    46023,
+    "Swiggy dinner",
+    "Lifestyle Enjoyment",
+    380,
+    "UPI",
+    "Want",
+    "Too tired to cook"
+  ],
+  [
+    46024,
+    "House Rent",
+    "Life Infrastructure",
+    12000,
+    "Bank Transfer",
+    "Need",
+    "Monthly rent"
+  ],
+  [
+    46024,
+    "Groceries - BigBasket",
+    "Life Infrastructure",
+    1600,
+    "UPI",
+    "Need",
+    "Monthly stock"
+  ],
+  [
+    46024,
+    "Swiggy lunch",
+    "Lifestyle Enjoyment",
+    320,
+    "UPI",
+    "Want",
+    "Office lunch"
+  ],
+  [
+    46024,
+    "Chai tapri",
+    "Lifestyle Enjoyment",
+    30,
+    "Cash",
+    "Want",
+    "Evening chai"
+  ],
+  [
+    46025,
+    "Myntra sale - clothes",
+    "Lifestyle Enjoyment",
+    3200,
+    "Credit Card",
+    "Want",
+    "New year sale haul"
+  ],
+  [
+    46025,
+    "Movie + popcorn",
+    "Lifestyle Enjoyment",
+    800,
+    "UPI",
+    "Want",
+    "Weekend movie"
+  ],
+  [
+    46025,
+    "Dinner out - Barbeque Nation",
+    "Lifestyle Enjoyment",
+    1100,
+    "Credit Card",
+    "Want",
+    "Saturday dinner"
+  ],
+  [
+    46025,
+    "Uber rides",
+    "Life Infrastructure",
+    280,
+    "UPI",
+    "Need",
+    "Mall + movie"
+  ],
+  [
+    46026,
+    "Zomato brunch",
+    "Lifestyle Enjoyment",
+    550,
+    "UPI",
+    "Want",
+    "Lazy Sunday"
+  ],
+  [
+    46026,
+    "Groceries - Zepto",
+    "Life Infrastructure",
+    420,
+    "UPI",
+    "Need",
+    "Quick essentials"
+  ],
+  [
+    46026,
+    "Amazon - Bluetooth speaker",
+    "Lifestyle Enjoyment",
+    1800,
+    "Credit Card",
+    "Want",
+    "Impulse buy"
+  ]
+]
+
+=== Weekly Analysis ===
+[
+  [
+    "Mode",
+    "Quarter",
+    null,
+    "Week Start",
+    "Week End",
+    "Spend",
+    "Limit",
+    "Ratio"
+  ],
+  [
+    "Quarter",
+    "Q1",
+    null,
+    46385,
+    46026,
+    23880,
+    10000,
+    239
+  ],
+  [
+    "Start Month",
+    null,
+    null,
+    46027,
+    46033,
+    15957,
+    10000,
+    160
+  ],
+  [
+    "End Month",
+    null,
+    null,
+    46034,
+    46040,
+    12239,
+    10000,
+    122
+  ],
+  [
+    "Category",
+    "All",
+    null,
+    46041,
+    46047,
+    7010,
+    10000,
+    70
+  ],
+  [
+    "Payment Mode",
+    "All",
+    null,
+    46048,
+    46054,
+    17770,
+    10000,
+    178
+  ],
+  [
+    null,
+    null,
+    null,
+    46055,
+    46061,
+    15288,
+    10000,
+    153
+  ],
+  [
+    null,
+    null,
+    null,
+    46062,
+    46068,
+    13418,
+    10000,
+    134
+  ],
+  [
+    null,
+    null,
+    null,
+    46069,
+    46075,
+    6050,
+    10000,
+    61
+  ],
+  [
+    null,
+    null,
+    null,
+    46076,
+    46082,
+    18190,
+    10000,
+    182
+  ],
+  [
+    null,
+    null,
+    null,
+    46083,
+    46089,
+    16738,
+    10000,
+    167
+  ],
+  [
+    null,
+    null,
+    null,
+    46090,
+    46096,
+    14338,
+    10000,
+    143
+  ],
+  [
+    null,
+    null,
+    null,
+    46097,
+    46103,
+    12010,
+    10000,
+    120
+  ],
+  [
+    null,
+    null,
+    null,
+    46104,
+    46110,
+    9118,
+    10000,
+    91
+  ],
+  [
+    null,
+    null,
+    null,
+    46111,
+    46117,
+    26017,
+    10000,
+    260
+  ]
+]
+
+=== Monthly Analysis ===
+[
+  [
+    "Month",
+    "Year",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Score"
+  ],
+  [
+    "Apr",
+    2026,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    10
+  ],
+  [],
+  [
+    "Date",
+    "Spent"
+  ],
+  [
+    46113,
+    13850
+  ],
+  [
+    46114,
+    1079
+  ],
+  [
+    46115,
+    2180
+  ],
+  [
+    46116,
+    1580
+  ],
+  [
+    46117,
+    768
+  ],
+  [
+    46118,
+    1580
+  ],
+  [
+    46119,
+    1260
+  ],
+  [
+    46120,
+    1329
+  ],
+  [
+    46121,
+    420
+  ],
+  [
+    46122,
+    1000
+  ],
+  [
+    46123,
+    2330
+  ]
+]
+
+=== Yearly Calendar ===
+[
+  [
+    "Year: 2026"
+  ],
+  [
+    "Last updated: 20:05"
+  ],
+  [
+    null,
+    "Jan",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Feb",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Mar",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Apr",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "May",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Jun",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Jul",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Aug",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Sep",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Oct",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Nov",
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Dec"
+  ],
+  [],
+  [
+    "Mon"
+  ],
+  [
+    "Tue"
+  ],
+  [
+    "Wed"
+  ],
+  [
+    "Thu"
+  ],
+  [
+    "Fri"
+  ],
+  [
+    "Sat"
+  ],
+  [
+    "Sun"
+  ],
+  [],
+  [],
+  [],
+  []
+]
+
+=== Calc ===
+[
+  [
+    "Selected Date Range",
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Category",
+    "Budget",
+    "Actual",
+    "Difference"
+  ],
+  [
+    46113,
+    46143,
+    null,
+    null,
+    null,
+    null,
+    "Need",
+    25000,
+    22788,
+    2212
+  ],
+  [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Want",
+    15000,
+    5518,
+    9482
+  ],
+  [
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    "Saving",
+    10000,
+    10000,
+    0
+  ],
+  [
+    "Category",
+    "Actual Spend",
+    "Type",
+    "Total",
+    38306
+  ],
+  [
+    "Life Infrastructure",
+    21288,
+    "Need",
+    "Amount Left",
+    11694
+  ],
+  [
+    "Future Me",
+    10000,
+    "Saving",
+    "Percentage Left",
+    0.23388
+  ],
+  [
+    "Performance & Growth",
+    1500,
+    "Need"
+  ],
+  [
+    "Relationships & Generosity",
+    500,
+    "Want"
+  ],
+  [
+    "Lifestyle Enjoyment",
+    5018,
+    "Want"
+  ],
+  [
+    "Weekly limit"
+  ],
+  [
+    10000
+  ],
+  [],
+  [],
+  []
+]

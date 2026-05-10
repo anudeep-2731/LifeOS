@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import { db, getTodayStr, seedTodayData, computeStreak, getVictory, saveVictory } from '../db/database';
 import { askGemini } from '../lib/ai';
-import StatsHeader from '../components/ui/StatsHeader';
 import { cn } from '../lib/utils';
 
 const getGreeting = () => {
@@ -32,8 +31,6 @@ export default function DashboardTab() {
   const [phase, setPhase] = useState(getPhase());
   const [victory, setVictory] = useState('');
   const [savedVictory, setSavedVictory] = useState(null);
-  const [synergyActive, setSynergyActive] = useState(false);
-  
   const navigate = useNavigate();
   const today = getTodayStr();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -69,13 +66,6 @@ export default function DashboardTab() {
       const vict = await getVictory(today);
       setSavedVictory(vict);
 
-      // Synergy check
-      const lastRoutine = await db.userStats.get('lastRoutineCompletion');
-      if (lastRoutine) {
-        const diff = (new Date().getTime() - new Date(lastRoutine.value).getTime()) / (1000 * 60);
-        setSynergyActive(diff <= 20);
-      }
-
       // Daily AI insight — phase aware
       const insightKey = `aiInsight_${today}_${phase}`;
       const cached = await db.settings.get(insightKey);
@@ -108,15 +98,12 @@ export default function DashboardTab() {
     setVictory('');
   };
 
-  const taskPct    = stats.tasks    ? Math.round((stats.tasksDone    / stats.tasks)    * 100) : 0;
-  const routinePct = stats.routines ? Math.round((stats.routinesDone / stats.routines) * 100) : 0;
+  const taskPct = stats.tasks ? Math.round((stats.tasksDone / stats.tasks) * 100) : 0;
 
   return (
     <div className={cn("min-h-screen flex flex-col pb-20 transition-colors duration-1000", 
       phase === 'ZEN' ? 'bg-orange-50/30' : phase === 'HUSTLE' ? 'bg-blue-50/30' : 'bg-purple-50/30'
     )}>
-      <StatsHeader />
-
       <div className="px-4 pt-4 space-y-6">
         {/* Header Section */}
         <div className="px-2 flex justify-between items-end">
@@ -148,14 +135,10 @@ export default function DashboardTab() {
         )}
 
         {phase === 'HUSTLE' && (
-           <div className={cn("bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden", 
-              synergyActive && "ring-4 ring-blue-300 ring-offset-2 animate-pulse"
-           )}>
+           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
               <Icon name="bolt" size={48} className="text-white/20 absolute -bottom-4 -right-4" />
-              <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">
-                 {synergyActive ? "🔥 SYNERGY ACTIVE" : "Next Mission"}
-              </p>
+              <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">Next Mission</p>
               <h2 className="text-3xl font-headline font-black mb-1 truncate">
                  {focusTask ? focusTask.title : "Queue Empty"}
               </h2>

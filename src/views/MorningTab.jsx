@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, seedTodayData, computeStreak, rolloverHabitTemplates, giftXP, updateLastRoutineCompletion } from '../db/database';
+import { db, getTodayStr, seedTodayData, computeStreak, rolloverHabitTemplates } from '../db/database';
 import { scheduleNotifications } from '../lib/notifications';
-import StatsHeader from '../components/ui/StatsHeader';
 
 const getGreeting = () => {
   const h = new Date().getHours();
@@ -293,14 +292,7 @@ export default function MorningTab() {
   }, []);
 
   const handleToggle = async (routine) => {
-    const isCompleting = !routine.completed;
-    await db.routines.update(routine.id, { completed: isCompleting });
-    
-    if (isCompleting) {
-      await giftXP(25, `Routine: ${routine.title}`);
-      await updateLastRoutineCompletion(); // Start synergy window
-    }
-    
+    await db.routines.update(routine.id, { completed: !routine.completed });
     loadRoutines();
     loadStreak();
   };
@@ -329,7 +321,6 @@ export default function MorningTab() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <StatsHeader />
 
       {/* Header */}
       <div className="pt-4 px-6 pb-6 bg-surface-container-low">

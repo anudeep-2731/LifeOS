@@ -274,21 +274,23 @@ export const rolloverRecurringTasks = async (today) => {
  */
 export const rolloverFinancials = async (currentMonth) => {
   const prevMonth = getPrevMonthStr(currentMonth);
-  
-  const tables = ['investments', 'income', 'emis'];
-  
-  for (const table of tables) {
-    const existing = await db[table].where('month').equals(currentMonth).count();
-    if (existing > 0) continue;
-    
-    const prevItems = await db[table].where('month').equals(prevMonth).toArray();
-    for (const item of prevItems) {
-      await db[table].add({
-        month: currentMonth,
-        category: item.category,
-        amount: item.amount,
-        note: item.note || ''
-      });
+
+  const [currentEmis, prevEmis, currentInvests, prevInvests] = await Promise.all([
+    db.emis.where('month').equals(currentMonth).toArray(),
+    db.emis.where('month').equals(prevMonth).toArray(),
+    db.investments.where('month').equals(currentMonth).toArray(),
+    db.investments.where('month').equals(prevMonth).toArray(),
+  ]);
+
+  if (currentEmis.length === 0 && prevEmis.length > 0) {
+    for (const e of prevEmis) {
+      await db.emis.add({ month: currentMonth, category: e.category, amount: e.amount, note: e.note || '' });
+    }
+  }
+
+  if (currentInvests.length === 0 && prevInvests.length > 0) {
+    for (const inv of prevInvests) {
+      await db.investments.add({ month: currentMonth, category: inv.category, amount: inv.amount, note: inv.note || '' });
     }
   }
 };
@@ -349,15 +351,23 @@ export const seedTodayData = async () => {
     await db.settings.put({
       key: 'expenseCategories',
       value: [
-        { name: 'Food',          icon: 'local_cafe',      color: 'text-primary',    bg: 'bg-primary/10'    },
-        { name: 'Transport',     icon: 'directions_car',  color: 'text-secondary',  bg: 'bg-secondary/10'  },
-        { name: 'Shopping',      icon: 'shopping_bag',    color: 'text-tertiary',   bg: 'bg-tertiary/10'   },
-        { name: 'Dining',        icon: 'restaurant',      color: 'text-primary',    bg: 'bg-primary/10'    },
-        { name: 'Utilities',     icon: 'wifi',            color: 'text-secondary',  bg: 'bg-secondary/10'  },
-        { name: 'Health',        icon: 'favorite',        color: 'text-error',      bg: 'bg-error/10'      },
-        { name: 'Entertainment', icon: 'movie',          color: 'text-tertiary',   bg: 'bg-tertiary/10'   },
-        { name: 'Other',         icon: 'more_horiz',      color: 'text-outline',    bg: 'bg-surface-container' },
+        { name: 'Food',          icon: 'local_cafe',      color: 'text-primary',    bg: 'bg-primary/10',    type: 'Need', defaultPaymentMode: 'UPI' },
+        { name: 'Transport',     icon: 'directions_car',  color: 'text-secondary',  bg: 'bg-secondary/10',  type: 'Need', defaultPaymentMode: 'UPI' },
+        { name: 'Shopping',      icon: 'shopping_bag',    color: 'text-tertiary',   bg: 'bg-tertiary/10',   type: 'Want', defaultPaymentMode: 'Credit Card' },
+        { name: 'Dining',        icon: 'restaurant',      color: 'text-primary',    bg: 'bg-primary/10',    type: 'Want', defaultPaymentMode: 'Credit Card' },
+        { name: 'Utilities',     icon: 'wifi',            color: 'text-secondary',  bg: 'bg-secondary/10',  type: 'Need', defaultPaymentMode: 'Bank Transfer' },
+        { name: 'Health',        icon: 'favorite',        color: 'text-error',      bg: 'bg-error/10',      type: 'Need', defaultPaymentMode: 'UPI' },
+        { name: 'Entertainment', icon: 'movie',          color: 'text-tertiary',   bg: 'bg-tertiary/10',   type: 'Want', defaultPaymentMode: 'UPI' },
+        { name: 'Other',         icon: 'more_horiz',      color: 'text-outline',    bg: 'bg-surface-container', type: 'Want', defaultPaymentMode: 'Cash' },
       ]
+    });
+  }
+
+  const budgetRules = await db.settings.get('budgetRules');
+  if (!budgetRules) {
+    await db.settings.put({
+      key: 'budgetRules',
+      value: { needs: 50, wants: 30, savings: 20 }
     });
   }
 
