@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
-import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak, getExpiringPerks, computePortfolioNetWorth } from '../db/database';
+import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
+import { 
+  fetchCloudExpenses, 
+  fetchCloudSchedule, 
+  computeCloudPortfolioNetWorth, 
+  getCloudExpiringPerks, 
+  updateCloudScheduleItem 
+} from '../lib/supabase';
 import { askGemini } from '../lib/ai';
 import { cn } from '../lib/utils';
 
@@ -35,28 +42,27 @@ export default function DashboardTab() {
     await seedTodayData();
 
     // 1. Fetch Month Expenses & Today Expenses
-    const monthExpenses = await db.expenses.filter(e => e.date.startsWith(currentMonth)).toArray();
+    const monthExpenses = await fetchCloudExpenses(currentMonth);
     const mSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
     const tSpent = monthExpenses.filter(e => e.date === today).reduce((s, e) => s + e.amount, 0);
     setMonthSpent(mSpent);
     setTodaySpent(tSpent);
 
     // 2. Fetch Today's Uncompleted Tasks & Routines
-    const [routines, tasks, streakVal, perks, nwData] = await Promise.all([
-      db.routines.where('date').equals(today).toArray(),
-      db.tasks.where('date').equals(today).toArray(),
+    const [schedData, streakVal, perks, nwData] = await Promise.all([
+      fetchCloudSchedule(today),
       computeStreak(),
-      getExpiringPerks(30),
-      computePortfolioNetWorth(),
+      getCloudExpiringPerks(30),
+      computeCloudPortfolioNetWorth(),
     ]);
 
-    const uncompletedRoutines = routines
+    const uncompletedRoutines = (schedData.routines || [])
       .filter(r => !r.completed)
-      .map(r => ({ id: r.id, itemType: 'routine', title: r.title, time: r.start || '08:00', tag: 'Habit Routine', color: 'text-emerald-400 bg-emerald-500/10' }));
+      .map(r => ({ ...r, id: r.id, itemType: 'routine', title: r.title, time: r.start || '08:00', tag: 'Habit Routine', color: 'text-emerald-400 bg-emerald-500/10' }));
 
-    const uncompletedTasks = tasks
+    const uncompletedTasks = (schedData.tasks || [])
       .filter(t => !t.completed)
-      .map(t => ({ id: t.id, itemType: 'task', title: t.title, time: t.scheduledTime || '10:00', tag: `${t.priority || 'Medium'} Priority`, color: 'text-primary bg-primary/10' }));
+      .map(t => ({ ...t, id: t.id, itemType: 'task', title: t.title, time: t.scheduledTime || '10:00', tag: `${t.priority || 'Medium'} Priority`, color: 'text-primary bg-primary/10' }));
 
     const mergedPending = [...uncompletedRoutines, ...uncompletedTasks];
     mergedPending.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
@@ -88,11 +94,7 @@ export default function DashboardTab() {
   }, []);
 
   const handleToggleItem = async (item) => {
-    if (item.itemType === 'routine') {
-      await db.routines.update(item.id, { completed: true });
-    } else {
-      await db.tasks.update(item.id, { completed: true });
-    }
+    await updateCloudScheduleItem(item.id, { ...item, completed: true });
     loadHomeData();
   };
 

@@ -4,6 +4,12 @@ import BottomSheet from '../components/ui/BottomSheet';
 import DatePickerModal from '../components/ui/DatePickerModal';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, getWeekDates, seedTodayData } from '../db/database';
+import { 
+  fetchCloudSchedule, 
+  addCloudScheduleItem, 
+  updateCloudScheduleItem, 
+  deleteCloudScheduleItem 
+} from '../lib/supabase';
 
 export default function ScheduleTab() {
   const [selectedDate, setSelectedDate] = useState(getTodayStr());
@@ -35,14 +41,9 @@ export default function ScheduleTab() {
   const loadSchedule = async () => {
     setLoading(true);
     await seedTodayData();
-
-    const [dayRoutines, dayTasks] = await Promise.all([
-      db.routines.where('date').equals(selectedDate).toArray(),
-      db.tasks.where('date').equals(selectedDate).toArray(),
-    ]);
-
-    setRoutines(dayRoutines);
-    setTasks(dayTasks);
+    const data = await fetchCloudSchedule(selectedDate);
+    setRoutines(data.routines || []);
+    setTasks(data.tasks || []);
     setLoading(false);
   };
 
@@ -51,13 +52,19 @@ export default function ScheduleTab() {
   }, [selectedDate]);
 
   const toggleRoutine = async (id, currentCompleted) => {
-    await db.routines.update(id, { completed: !currentCompleted });
-    loadSchedule();
+    const target = routines.find(r => r.id === id);
+    if (target) {
+      await updateCloudScheduleItem(id, { ...target, completed: !currentCompleted });
+      await loadSchedule();
+    }
   };
 
   const toggleTask = async (id, currentCompleted) => {
-    await db.tasks.update(id, { completed: !currentCompleted });
-    loadSchedule();
+    const target = tasks.find(t => t.id === id);
+    if (target) {
+      await updateCloudScheduleItem(id, { ...target, completed: !currentCompleted });
+      await loadSchedule();
+    }
   };
 
   const openEditModal = (item) => {
@@ -74,12 +81,8 @@ export default function ScheduleTab() {
   };
 
   const handleDeleteItem = async (item) => {
-    if (item.itemType === 'routine') {
-      await db.routines.delete(item.id);
-    } else {
-      await db.tasks.delete(item.id);
-    }
-    loadSchedule();
+    await deleteCloudScheduleItem(item.id);
+    await loadSchedule();
   };
 
   const handleSaveEvent = async (e) => {
@@ -90,54 +93,41 @@ export default function ScheduleTab() {
 
     if (editItem) {
       // Edit existing event
-      if (editItem.itemType === 'routine') {
-        await db.routines.update(editItem.id, {
-          date: targetDate,
-          title: title.trim(),
-          start: scheduledTime,
-          duration: Number(duration),
-          type: category,
-          notes: notes.trim(),
-        });
-      } else {
-        await db.tasks.update(editItem.id, {
-          date: targetDate,
-          dueDate: dueDate || targetDate,
-          title: title.trim(),
-          scheduledTime,
-          duration: Number(duration),
-          priority,
-          notes: notes.trim(),
-        });
-      }
+      await updateCloudScheduleItem(editItem.id, {
+        itemType: editItem.itemType,
+        date: targetDate,
+        dueDate: dueDate || targetDate,
+        title: title.trim(),
+        scheduledTime,
+        start: scheduledTime,
+        duration: Number(duration),
+        category,
+        type: category,
+        priority,
+        notes: notes.trim(),
+        completed: Boolean(editItem.completed),
+      });
       setEditItem(null);
     } else {
       // Add new event
-      if (eventType === 'routine') {
-        await db.routines.add({
-          date: targetDate,
-          title: title.trim(),
-          start: scheduledTime,
-          duration: Number(duration),
-          type: category,
-          notes: notes.trim(),
-          completed: false,
-        });
-      } else {
-        await db.tasks.add({
-          date: targetDate,
-          dueDate: dueDate || targetDate,
-          title: title.trim(),
-          scheduledTime,
-          duration: Number(duration),
-          priority,
-          notes: notes.trim(),
-          completed: false,
-          postponeCount: 0,
-        });
-      }
+      await addCloudScheduleItem({
+        itemType: eventType,
+        date: targetDate,
+        dueDate: dueDate || targetDate,
+        title: title.trim(),
+        scheduledTime,
+        start: scheduledTime,
+        duration: Number(duration),
+        category,
+        type: category,
+        priority,
+        notes: notes.trim(),
+        completed: false,
+      });
       setShowAddModal(false);
     }
+
+    await syncWithSupabase();
 
     // Switch view to target date if different
     if (targetDate !== selectedDate) {

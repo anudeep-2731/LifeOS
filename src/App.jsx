@@ -7,7 +7,7 @@ import ScheduleTab from './views/ScheduleTab';
 import ExpensesTab from './views/ExpensesTab';
 import PortfolioTab from './views/PortfolioTab';
 import AuthView from './views/AuthView';
-import { getSupabase } from './lib/supabase';
+import { getSupabase, migrateLocalDataToSupabase } from './lib/supabase';
 
 function AppContent() {
   const [session, setSession] = useState(null);
@@ -20,9 +20,15 @@ function AppContent() {
       if (client) {
         const { data: { session: currentSession } } = await client.auth.getSession();
         setSession(currentSession);
+        if (currentSession) {
+          await migrateLocalDataToSupabase();
+        }
 
-        const { data: { subscription } } = client.auth.onAuthStateChange((_event, newSession) => {
+        const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, newSession) => {
           setSession(newSession);
+          if (newSession) {
+            await migrateLocalDataToSupabase();
+          }
         });
 
         setLoading(false);

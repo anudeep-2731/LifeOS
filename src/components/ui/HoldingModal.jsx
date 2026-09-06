@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import BottomSheet from './BottomSheet';
-import { db, getTodayStr } from '../../db/database';
+import { getTodayStr } from '../../db/database';
+import { addCloudHolding, updateCloudHolding } from '../../lib/supabase';
 
 const SUBCATEGORIES_MAP = {
   'Liquid Funds': ['Cash in Hand', 'Savings Account', 'Digital Wallet', 'Emergency Fund'],
@@ -58,9 +59,9 @@ export default function HoldingModal({ isOpen, onClose, initialData, defaultGrou
     };
 
     if (initialData?.id) {
-      await db.holdings.update(initialData.id, holdingData);
+      await updateCloudHolding(initialData.id, holdingData);
     } else {
-      await db.holdings.add(holdingData);
+      await addCloudHolding(holdingData);
     }
 
     if (onSave) onSave();

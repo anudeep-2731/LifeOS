@@ -4,7 +4,11 @@ import HoldingModal from '../components/ui/HoldingModal';
 import ExecutiveOverviewSection from '../components/finance/ExecutiveOverviewSection';
 import MasterPortfolioSection from '../components/finance/MasterPortfolioSection';
 import STIMatrixSection from '../components/finance/STIMatrixSection';
-import { db, computePortfolioNetWorth, getExpiringPerks } from '../db/database';
+import { 
+  computeCloudPortfolioNetWorth, 
+  getCloudExpiringPerks, 
+  deleteCloudHolding 
+} from '../lib/supabase';
 import { cn } from '../lib/utils';
 
 export default function PortfolioTab() {
@@ -28,8 +32,8 @@ export default function PortfolioTab() {
     setLoading(true);
     try {
       const [portData, expPerks] = await Promise.all([
-        computePortfolioNetWorth(),
-        getExpiringPerks(30),
+        computeCloudPortfolioNetWorth(),
+        getCloudExpiringPerks(30),
       ]);
       setMetrics(portData);
       setHoldings(portData.holdings || []);
@@ -58,8 +62,8 @@ export default function PortfolioTab() {
   };
 
   const handleDeleteHolding = async (id) => {
-    await db.holdings.delete(id);
-    refreshPortfolio();
+    await deleteCloudHolding(id);
+    await refreshPortfolio();
   };
 
   return (

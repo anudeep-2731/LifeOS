@@ -3,7 +3,14 @@ import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import FinanceSettingsSheet from '../components/ui/FinanceSettingsSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials, adjustHoldingBalance } from '../db/database';
+import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials } from '../db/database';
+import { 
+  fetchCloudExpenses, 
+  addCloudExpense, 
+  updateCloudExpense, 
+  deleteCloudExpense, 
+  adjustCloudHoldingBalance 
+} from '../lib/supabase';
 import { DEFAULT_CATEGORY, EMPTY_FORM } from '../lib/constants';
 import { downloadCSV } from '../lib/ExportUtils';
 
@@ -71,14 +78,7 @@ function ExpenseForm({ onSave, onClose, initialData, editId, categories = [] }) 
     const date = form.date || getTodayStr();
 
     if (editId) {
-      // Calculate delta if amount or source changed
-      const prev = await db.expenses.get(editId);
-      if (prev) {
-        // Restore old balance if old source was liquid fund
-        await adjustHoldingBalance(prev.paymentSource, prev.amount);
-      }
-
-      await db.expenses.update(editId, {
+      await updateCloudExpense(editId, {
         amount,
         category: form.category,
         description: form.description.trim(),
@@ -86,14 +86,12 @@ function ExpenseForm({ onSave, onClose, initialData, editId, categories = [] }) 
         paymentSource: form.paymentSource || 'HDFC Bank',
         notes: form.notes || '',
       });
-
-      // Deduct new amount from new source
-      await adjustHoldingBalance(form.paymentSource, -amount);
+      await adjustCloudHoldingBalance(form.paymentSource, -amount);
     } else {
       const now = new Date();
       const timestamp = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
       
-      await db.expenses.add({
+      await addCloudExpense({
         date,
         timestamp,
         amount,
@@ -103,8 +101,7 @@ function ExpenseForm({ onSave, onClose, initialData, editId, categories = [] }) 
         notes: form.notes || '',
       });
 
-      // Deduct amount from selected account holding balance
-      await adjustHoldingBalance(form.paymentSource, -amount);
+      await adjustCloudHoldingBalance(form.paymentSource, -amount);
     }
 
     onSave();
@@ -209,8 +206,7 @@ export default function ExpensesTab() {
     if (b) setBudget(b.value);
     if (ec) setCategories(ec.value);
 
-    const monthExpenses = await db.expenses.filter(e => e.date.startsWith(selectedMonth)).toArray();
-    monthExpenses.sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
+    const monthExpenses = await fetchCloudExpenses(selectedMonth);
     setExpenses(monthExpenses);
 
     const [currentIncome, currentEmis] = await Promise.all([
@@ -235,15 +231,16 @@ export default function ExpensesTab() {
       if (amount && description) {
         const now = new Date();
         const timestamp = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
-        await db.expenses.add({
+        await addCloudExpense({
           date: today,
           timestamp,
           amount,
           description,
           category: DEFAULT_CATEGORY,
+          paymentSource: 'HDFC Bank'
         });
         setNlInput('');
-        loadData();
+        await loadData();
       }
     } catch (err) {
       console.error(err);
@@ -257,12 +254,11 @@ export default function ExpensesTab() {
   }, [selectedMonth]);
 
   const handleDelete = async (expense) => {
-    // Restore balance if paymentSource was a liquid fund
     if (expense.paymentSource) {
-      await adjustHoldingBalance(expense.paymentSource, expense.amount);
+      await adjustCloudHoldingBalance(expense.paymentSource, expense.amount);
     }
-    await db.expenses.delete(expense.id);
-    loadData();
+    await deleteCloudExpense(expense.id);
+    await loadData();
   };
 
   const monthSpent = expenses.reduce((s, e) => s + e.amount, 0);

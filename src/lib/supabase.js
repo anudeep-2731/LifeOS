@@ -1,21 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import { db } from '../db/database';
 
-// Defaults or user-configured Supabase settings in localStorage/IndexedDB
-const DEFAULT_SUPABASE_URL = 'https://YOUR_SUPABASE_PROJECT_ID.supabase.co';
-const DEFAULT_SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-
+// Defaults or user-configured Supabase settings
 let supabaseClient = null;
 
 export const getSupabaseConfig = async () => {
-  const [urlObj, keyObj] = await Promise.all([
-    db.settings.get('supabase_url'),
-    db.settings.get('supabase_anon_key')
-  ]);
-  
-  const url = urlObj?.value || import.meta.env.VITE_SUPABASE_URL || '';
-  const key = keyObj?.value || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-  
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY || '';
   return { url, key, isConfigured: Boolean(url && key && !url.includes('YOUR_SUPABASE')) };
 };
 
@@ -132,81 +123,420 @@ create policy "Users can delete own schedule" on public.schedule
   for delete using (auth.uid() = user_id);
 `;
 
-// ─── Realtime Cloud Sync Engine ────────────────────────────────────────────────
-export const syncWithSupabase = async () => {
+// ─── Direct Cloud CRUD API (Single Source of Truth) ───────────────────────────
+
+// 1. EXPENSES API
+export const fetchCloudExpenses = async (monthStr) => {
   const client = await getSupabase();
-  if (!client) return { success: false, reason: 'Supabase not configured' };
-
+  if (!client) return [];
   const { data: { session } } = await client.auth.getSession();
-  if (!session?.user) return { success: false, reason: 'User not logged in' };
+  if (!session?.user) return [];
 
-  const userId = session.user.id;
+  let query = client.from('expenses').select('*').eq('user_id', session.user.id);
+  if (monthStr) {
+    query = query.gte('date', `${monthStr}-01`).lte('date', `${monthStr}-31`);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) {
+    console.error('Error fetching expenses:', error);
+    return [];
+  }
+  return (data || []).map(e => ({
+    id: e.id,
+    date: e.date,
+    timestamp: e.timestamp || '08:00',
+    amount: Number(e.amount) || 0,
+    category: e.category,
+    description: e.description,
+    paymentSource: e.payment_source || 'HDFC Bank',
+    notes: e.notes || '',
+  }));
+};
 
-  try {
-    // 1. Sync Holdings (Cloud -> Local Dexie & Local -> Cloud)
-    const { data: cloudHoldings, error: hErr } = await client.from('holdings').select('*');
-    if (!hErr && cloudHoldings && cloudHoldings.length > 0) {
-      const formatted = cloudHoldings.map(h => ({
-        group: h.group_name,
-        type: h.type,
-        platform: h.platform,
-        amount: Number(h.amount) || 0,
-        date: h.date || '',
-        expiry: h.expiry || '',
-      }));
-      await db.holdings.clear();
-      await db.holdings.bulkAdd(formatted);
-    } else {
-      // Push local holdings to cloud if cloud is empty
-      const localHoldings = await db.holdings.toArray();
-      if (localHoldings.length > 0) {
-        const payload = localHoldings.map(h => ({
-          user_id: userId,
-          group_name: h.group,
-          type: h.type,
-          platform: h.platform,
-          amount: h.amount,
-          date: h.date || '',
-          expiry: h.expiry || '',
-        }));
-        await client.from('holdings').insert(payload);
-      }
+export const addCloudExpense = async (expense) => {
+  const client = await getSupabase();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  const payload = {
+    user_id: session.user.id,
+    date: expense.date,
+    timestamp: expense.timestamp || '08:00',
+    amount: Number(expense.amount),
+    category: expense.category,
+    description: expense.description,
+    payment_source: expense.paymentSource || 'HDFC Bank',
+    notes: expense.notes || '',
+  };
+
+  const { data, error } = await client.from('expenses').insert(payload).select().single();
+  if (error) console.error('Error adding expense:', error);
+  return data;
+};
+
+export const updateCloudExpense = async (id, expense) => {
+  const client = await getSupabase();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  const payload = {
+    date: expense.date,
+    timestamp: expense.timestamp || '08:00',
+    amount: Number(expense.amount),
+    category: expense.category,
+    description: expense.description,
+    payment_source: expense.paymentSource || 'HDFC Bank',
+    notes: expense.notes || '',
+  };
+
+  const { data, error } = await client.from('expenses').update(payload).eq('id', id).eq('user_id', session.user.id).select().single();
+  if (error) console.error('Error updating expense:', error);
+  return data;
+};
+
+export const deleteCloudExpense = async (id) => {
+  const client = await getSupabase();
+  if (!client) return false;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return false;
+
+  const { error } = await client.from('expenses').delete().eq('id', id).eq('user_id', session.user.id);
+  if (error) console.error('Error deleting expense:', error);
+  return !error;
+};
+
+// 2. HOLDINGS API
+export const fetchCloudHoldings = async () => {
+  const client = await getSupabase();
+  if (!client) return [];
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return [];
+
+  const { data, error } = await client.from('holdings').select('*').eq('user_id', session.user.id);
+  if (error) {
+    console.error('Error fetching holdings:', error);
+    return [];
+  }
+  return (data || []).map(h => ({
+    id: h.id,
+    group: h.group_name,
+    type: h.type,
+    platform: h.platform,
+    amount: Number(h.amount) || 0,
+    date: h.date || '',
+    expiry: h.expiry || '',
+  }));
+};
+
+export const addCloudHolding = async (holding) => {
+  const client = await getSupabase();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  const payload = {
+    user_id: session.user.id,
+    group_name: holding.group,
+    type: holding.type,
+    platform: holding.platform,
+    amount: Number(holding.amount) || 0,
+    date: holding.date || '',
+    expiry: holding.expiry || '',
+  };
+
+  const { data, error } = await client.from('holdings').insert(payload).select().single();
+  if (error) console.error('Error adding holding:', error);
+  return data;
+};
+
+export const updateCloudHolding = async (id, holding) => {
+  const client = await getSupabase();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  const payload = {
+    group_name: holding.group,
+    type: holding.type,
+    platform: holding.platform,
+    amount: Number(holding.amount) || 0,
+    date: holding.date || '',
+    expiry: holding.expiry || '',
+  };
+
+  const { data, error } = await client.from('holdings').update(payload).eq('id', id).eq('user_id', session.user.id).select().single();
+  if (error) console.error('Error updating holding:', error);
+  return data;
+};
+
+export const deleteCloudHolding = async (id) => {
+  const client = await getSupabase();
+  if (!client) return false;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return false;
+
+  const { error } = await client.from('holdings').delete().eq('id', id).eq('user_id', session.user.id);
+  if (error) console.error('Error deleting holding:', error);
+  return !error;
+};
+
+export const adjustCloudHoldingBalance = async (paymentSource, amountDelta) => {
+  if (!paymentSource || paymentSource === 'Credit Card' || paymentSource === 'Other') return;
+  const holdings = await fetchCloudHoldings();
+  const liquid = holdings.filter(h => h.group === 'Liquid Funds');
+  const match = liquid.find(h =>
+    h.platform.toLowerCase().includes(paymentSource.toLowerCase()) ||
+    h.type.toLowerCase().includes(paymentSource.toLowerCase())
+  );
+  if (match) {
+    const newAmount = Math.max(0, match.amount + amountDelta);
+    await updateCloudHolding(match.id, { ...match, amount: newAmount });
+  }
+};
+
+export const computeCloudPortfolioNetWorth = async () => {
+  const holdings = await fetchCloudHoldings();
+  let liquid = 0, invested = 0, outside = 0, gold = 0, perks = 0;
+
+  holdings.forEach(h => {
+    const amt = Number(h.amount) || 0;
+    if (h.group === 'Liquid Funds') liquid += amt;
+    else if (h.group === 'Investments') invested += amt;
+    else if (h.group === 'Outside Money') outside += amt;
+    else if (h.group === 'Physical Assets') gold += amt;
+    else if (h.group === 'Perks & Rewards') perks += amt;
+  });
+
+  const financialNetWorth = liquid + invested + outside;
+  const combinedNetWorth = financialNetWorth + gold;
+
+  return { liquid, invested, outside, gold, perks, financialNetWorth, combinedNetWorth, holdings };
+};
+
+export const getCloudExpiringPerks = async (daysThreshold = 30) => {
+  const holdings = await fetchCloudHoldings();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiring = [];
+  holdings.filter(h => h.group === 'Perks & Rewards').forEach(h => {
+    if (!h.expiry) return;
+    const expDate = new Date(h.expiry);
+    expDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+    if (diffDays >= 0 && diffDays <= daysThreshold) {
+      expiring.push({ ...h, diffDays });
     }
+  });
 
-    // 2. Sync Expenses
-    const { data: cloudExpenses, error: eErr } = await client.from('expenses').select('*');
-    if (!eErr && cloudExpenses && cloudExpenses.length > 0) {
-      const formattedExp = cloudExpenses.map(e => ({
-        date: e.date,
-        timestamp: e.timestamp || '08:00',
-        amount: Number(e.amount) || 0,
-        category: e.category,
-        description: e.description,
-        paymentSource: e.payment_source || 'HDFC Bank',
-        notes: e.notes || '',
-      }));
-      await db.expenses.clear();
-      await db.expenses.bulkAdd(formattedExp);
-    } else {
-      const localExp = await db.expenses.toArray();
-      if (localExp.length > 0) {
-        const payloadExp = localExp.map(e => ({
+  return expiring;
+};
+
+// 3. SCHEDULE API
+export const fetchCloudSchedule = async (selectedDate) => {
+  const client = await getSupabase();
+  if (!client) return { routines: [], tasks: [] };
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return { routines: [], tasks: [] };
+
+  const { data, error } = await client
+    .from('schedule')
+    .select('*')
+    .eq('user_id', session.user.id)
+    .eq('date', selectedDate);
+
+  if (error) {
+    console.error('Error fetching schedule:', error);
+    return { routines: [], tasks: [] };
+  }
+
+  const routines = (data || [])
+    .filter(s => s.item_type === 'routine')
+    .map(s => ({
+      id: s.id,
+      itemType: 'routine',
+      date: s.date,
+      title: s.title,
+      start: s.scheduled_time || '08:00',
+      time: s.scheduled_time || '08:00',
+      duration: Number(s.duration) || 15,
+      type: s.category || 'Work',
+      completed: Boolean(s.completed),
+      notes: s.notes || '',
+    }));
+
+  const tasks = (data || [])
+    .filter(s => s.item_type === 'task')
+    .map(s => ({
+      id: s.id,
+      itemType: 'task',
+      date: s.date,
+      dueDate: s.due_date || s.date,
+      title: s.title,
+      duration: Number(s.duration) || 15,
+      priority: s.priority || 'Medium',
+      completed: Boolean(s.completed),
+      scheduledTime: s.scheduled_time || '08:00',
+      time: s.scheduled_time || '08:00',
+      notes: s.notes || '',
+    }));
+
+  return { routines, tasks };
+};
+
+export const addCloudScheduleItem = async (item) => {
+  const client = await getSupabase();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  const payload = {
+    user_id: session.user.id,
+    item_type: item.itemType,
+    date: item.date,
+    due_date: item.dueDate || item.date,
+    title: item.title,
+    scheduled_time: item.start || item.scheduledTime || '08:00',
+    duration: Number(item.duration) || 15,
+    category: item.type || item.category || 'Work',
+    priority: item.priority || 'Medium',
+    notes: item.notes || '',
+    completed: Boolean(item.completed),
+  };
+
+  const { data, error } = await client.from('schedule').insert(payload).select().single();
+  if (error) console.error('Error adding schedule item:', error);
+  return data;
+};
+
+export const updateCloudScheduleItem = async (id, item) => {
+  const client = await getSupabase();
+  if (!client) return null;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return null;
+
+  const payload = {
+    date: item.date,
+    due_date: item.dueDate || item.date,
+    title: item.title,
+    scheduled_time: item.start || item.scheduledTime || '08:00',
+    duration: Number(item.duration) || 15,
+    category: item.type || item.category || 'Work',
+    priority: item.priority || 'Medium',
+    notes: item.notes || '',
+    completed: Boolean(item.completed),
+  };
+
+  const { data, error } = await client.from('schedule').update(payload).eq('id', id).eq('user_id', session.user.id).select().single();
+  if (error) console.error('Error updating schedule item:', error);
+  return data;
+};
+
+export const deleteCloudScheduleItem = async (id) => {
+  const client = await getSupabase();
+  if (!client) return false;
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return false;
+
+  const { error } = await client.from('schedule').delete().eq('id', id).eq('user_id', session.user.id);
+  if (error) console.error('Error deleting schedule item:', error);
+  return !error;
+};
+
+export const syncWithSupabase = async () => {
+  return { success: true };
+};
+
+// ─── Automatic One-Time Migration Helper ──────────────────────────────────────
+export const migrateLocalDataToSupabase = async () => {
+  try {
+    const client = await getSupabase();
+    if (!client) return;
+
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user) return;
+
+    const userId = session.user.id;
+
+    // 1. Migrate Local Expenses
+    const localExpenses = await db.expenses.toArray();
+    if (localExpenses && localExpenses.length > 0) {
+      const { data: cloudExp } = await client.from('expenses').select('*').eq('user_id', userId);
+      const cloudSet = new Set((cloudExp || []).map(e => `${e.date}_${e.description}_${e.amount}`));
+      
+      const unmigrated = localExpenses.filter(e => !cloudSet.has(`${e.date}_${e.description}_${e.amount}`));
+      if (unmigrated.length > 0) {
+        const payload = unmigrated.map(e => ({
           user_id: userId,
           date: e.date,
           timestamp: e.timestamp || '08:00',
-          amount: e.amount,
+          amount: Number(e.amount),
           category: e.category,
           description: e.description,
           payment_source: e.paymentSource || 'HDFC Bank',
           notes: e.notes || '',
         }));
-        await client.from('expenses').insert(payloadExp);
+        await client.from('expenses').insert(payload);
       }
+      await db.expenses.clear();
     }
 
-    return { success: true, count: cloudHoldings?.length || 0 };
+    // 2. Migrate Local Holdings
+    const localHoldings = await db.holdings.toArray();
+    if (localHoldings && localHoldings.length > 0) {
+      const { data: cloudHoldings } = await client.from('holdings').select('*').eq('user_id', userId);
+      const cloudSet = new Set((cloudHoldings || []).map(h => `${h.group_name}_${h.platform}_${h.type}`));
+      
+      const unmigrated = localHoldings.filter(h => !cloudSet.has(`${h.group}_${h.platform}_${h.type}`));
+      if (unmigrated.length > 0) {
+        const payload = unmigrated.map(h => ({
+          user_id: userId,
+          group_name: h.group,
+          type: h.type,
+          platform: h.platform,
+          amount: Number(h.amount) || 0,
+          date: h.date || '',
+          expiry: h.expiry || '',
+        }));
+        await client.from('holdings').insert(payload);
+      }
+      await db.holdings.clear();
+    }
+
+    // 3. Migrate Local Schedule & Tasks
+    const localRoutines = await db.routines.toArray();
+    const localTasks = await db.tasks.toArray();
+    const localSched = [
+      ...(localRoutines || []).map(r => ({ ...r, itemType: 'routine' })),
+      ...(localTasks || []).map(t => ({ ...t, itemType: 'task' }))
+    ];
+    if (localSched && localSched.length > 0) {
+      const { data: cloudSched } = await client.from('schedule').select('*').eq('user_id', userId);
+      const cloudSet = new Set((cloudSched || []).map(s => `${s.date}_${s.title}_${s.item_type}`));
+      
+      const unmigrated = localSched.filter(s => !cloudSet.has(`${s.date}_${s.title}_${s.itemType}`));
+      if (unmigrated.length > 0) {
+        const payload = unmigrated.map(s => ({
+          user_id: userId,
+          item_type: s.itemType,
+          date: s.date,
+          due_date: s.dueDate || s.date,
+          title: s.title,
+          scheduled_time: s.start || s.scheduledTime || '08:00',
+          duration: Number(s.duration) || 15,
+          category: s.category || 'Work',
+          priority: s.priority || 'Medium',
+          notes: s.notes || '',
+          completed: Boolean(s.completed),
+        }));
+        await client.from('schedule').insert(payload);
+      }
+      await db.routines.clear();
+      await db.tasks.clear();
+    }
   } catch (err) {
-    console.error('Supabase Sync Error:', err);
-    return { success: false, reason: err.message };
+    console.error('Data migration error:', err);
   }
 };
