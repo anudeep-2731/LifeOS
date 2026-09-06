@@ -2,13 +2,15 @@ import { useState, useEffect, useRef } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import DatePickerModal from '../components/ui/DatePickerModal';
+import MasterRoutineModal from '../components/ui/MasterRoutineModal';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, getWeekDates, seedTodayData } from '../db/database';
 import { 
   fetchCloudSchedule, 
   addCloudScheduleItem, 
   updateCloudScheduleItem, 
-  deleteCloudScheduleItem 
+  deleteCloudScheduleItem,
+  autoPopulateDailyRoutines
 } from '../lib/supabase';
 
 export default function ScheduleTab() {
@@ -20,7 +22,9 @@ export default function ScheduleTab() {
 
   // Modals State
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showMasterModal, setShowMasterModal] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [editItem, setEditItem] = useState(null); // { id, itemType, title, start, duration, type, notes }
   const [expandedNotesId, setExpandedNotesId] = useState(null);
 
@@ -41,6 +45,7 @@ export default function ScheduleTab() {
   const loadSchedule = async () => {
     setLoading(true);
     await seedTodayData();
+    await autoPopulateDailyRoutines(selectedDate);
     const data = await fetchCloudSchedule(selectedDate);
     setRoutines(data.routines || []);
     setTasks(data.tasks || []);
@@ -191,13 +196,22 @@ export default function ScheduleTab() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowMasterModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-xs font-bold text-emerald-400 border border-emerald-500/20 shadow-sm transition-all"
+            >
+              <Icon name="tune" size={15} />
+              <span>Routine Blueprint</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowDatePicker(true)}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-surface-container-high text-xs font-bold text-outline hover:text-primary hover:bg-surface-container cursor-pointer transition-all border border-outline-variant/20 shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container-high text-xs font-bold text-outline hover:text-primary hover:bg-surface-container cursor-pointer transition-all border border-outline-variant/20 shadow-sm"
             >
-              <Icon name="event" size={16} className="text-primary" />
+              <Icon name="event" size={15} className="text-primary" />
               <span>Calendar</span>
             </button>
 
@@ -269,87 +283,197 @@ export default function ScheduleTab() {
             <p className="text-xs">Tap the "+" button to add a task or routine.</p>
           </div>
         ) : (
-          scheduleItems.map(item => {
-            const isExpanded = expandedNotesId === `${item.itemType}-${item.id}`;
+          <>
+            {/* Active Pending Agenda Items */}
+            {(() => {
+              const pendingItems = scheduleItems.filter(i => !i.completed);
+              const completedItems = scheduleItems.filter(i => i.completed);
 
-            return (
-              <div
-                key={`${item.itemType}-${item.id}`}
-                className={cn(
-                  'p-4 rounded-2xl border transition-all shadow-sm space-y-2',
-                  item.completed
-                    ? 'bg-surface-container/30 border-outline-variant/10 opacity-60'
-                    : 'bg-surface-container-lowest border-outline-variant/25 hover:border-primary/40'
-                )}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    {/* 1-Tap Checkbox */}
-                    <button
-                      onClick={() => item.itemType === 'routine' ? toggleRoutine(item.id, item.completed) : toggleTask(item.id, item.completed)}
-                      className={cn(
-                        'w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all flex-shrink-0',
-                        item.completed
-                          ? 'bg-primary border-primary text-white'
-                          : 'border-outline hover:border-primary'
-                      )}
-                    >
-                      {item.completed && <Icon name="check" size={14} />}
-                    </button>
-
-                    <div className="min-w-0 flex-1">
-                      <p className={cn('font-bold text-sm text-on-surface truncate', item.completed && 'line-through text-outline')}>
-                        {item.title}
-                      </p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[11px] font-bold text-outline flex items-center gap-1">
-                          <Icon name="schedule" size={12} /> {item.time} ({item.duration}m)
-                        </span>
-                        <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full border', item.color)}>
-                          {item.type}
-                        </span>
-                      </div>
+              return (
+                <>
+                  {pendingItems.length === 0 ? (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center text-emerald-400 space-y-1">
+                      <Icon name="task_alt" size={28} className="mx-auto" />
+                      <p className="font-bold text-sm">All Pending Agenda Completed!</p>
+                      <p className="text-xs text-emerald-400/80">Every routine and task for this day is marked complete.</p>
                     </div>
-                  </div>
+                  ) : (
+                    pendingItems.map((item, index) => {
+                      const isUpNext = index === 0;
+                      const isExpanded = expandedNotesId === `${item.itemType}-${item.id}`;
 
-                  {/* Actions: Edit & Notes Expand */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    {item.notes && (
+                      return (
+                        <div
+                          key={`${item.itemType}-${item.id}`}
+                          className={cn(
+                            'p-3.5 rounded-2xl border transition-all shadow-sm space-y-2 relative overflow-hidden',
+                            isUpNext
+                              ? 'bg-surface-container-lowest border-primary/50 border-l-4 border-l-primary shadow-md'
+                              : 'bg-surface-container-lowest border-outline-variant/25 hover:border-primary/40'
+                          )}
+                        >
+                          <div className="flex items-center justify-between gap-2.5">
+                            <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                              {/* 1-Tap Checkbox */}
+                              <button
+                                onClick={() => item.itemType === 'routine' ? toggleRoutine(item.id, item.completed) : toggleTask(item.id, item.completed)}
+                                className="w-5 h-5 rounded-full border-2 border-outline hover:border-primary flex items-center justify-center transition-all flex-shrink-0"
+                              >
+                                <Icon name="check" size={12} className="opacity-0 hover:opacity-100 text-primary" />
+                              </button>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="font-bold text-xs text-on-surface leading-snug break-words">
+                                    {item.title}
+                                  </p>
+                                  {isUpNext && (
+                                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-primary text-white flex items-center gap-0.5 flex-shrink-0 shadow-sm uppercase tracking-wider">
+                                      <Icon name="play_arrow" size={10} /> Up Next
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                  <span className="text-[11px] font-semibold text-outline flex items-center gap-1">
+                                    <Icon name="schedule" size={12} /> {item.time} ({item.duration}m)
+                                  </span>
+                                  <span className={cn('text-[9px] font-bold px-2 py-0.5 rounded-full border', item.color)}>
+                                    {item.type}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Actions: Edit & Notes Expand */}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {item.notes && (
+                                <button
+                                  onClick={() => setExpandedNotesId(isExpanded ? null : `${item.itemType}-${item.id}`)}
+                                  className="p-1 text-outline hover:text-primary transition-colors"
+                                  title="View Key Notes & Focus"
+                                >
+                                  <Icon name={isExpanded ? "expand_less" : "info"} size={16} />
+                                </button>
+                              )}
+                              <button
+                                onClick={() => openEditModal(item)}
+                                className="p-1 text-outline hover:text-primary transition-colors"
+                                title="Edit / Reschedule Event"
+                              >
+                                <Icon name="edit" size={15} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteItem(item)}
+                                className="p-1 text-outline hover:text-error transition-colors"
+                                title="Delete Event"
+                              >
+                                <Icon name="delete" size={15} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expandable Key Focus & Notes */}
+                          {isExpanded && item.notes && (
+                            <div className="pt-2 border-t border-outline-variant/15 text-xs text-outline leading-relaxed whitespace-pre-wrap bg-surface-container/30 p-2.5 rounded-xl">
+                              <p className="font-bold text-primary text-[11px] mb-1">Key Focus & Specific Notes:</p>
+                              {item.notes}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* Collapsible Completed Tasks Accordion Bar */}
+                  {completedItems.length > 0 && (
+                    <div className="pt-3 space-y-2">
                       <button
-                        onClick={() => setExpandedNotesId(isExpanded ? null : `${item.itemType}-${item.id}`)}
-                        className="p-1.5 text-outline hover:text-primary transition-colors"
-                        title="View Key Notes & Focus"
+                        type="button"
+                        onClick={() => setShowCompleted(prev => !prev)}
+                        className="w-full bg-surface-container/50 hover:bg-surface-container/80 rounded-2xl p-3 border border-outline-variant/20 flex items-center justify-between transition-all"
                       >
-                        <Icon name={isExpanded ? "expand_less" : "info"} size={18} />
+                        <div className="flex items-center gap-2 text-xs font-bold text-outline">
+                          <Icon name="check_circle" size={16} className="text-emerald-400" />
+                          <span>Completed tasks for that day ({completedItems.length})</span>
+                        </div>
+                        <Icon name={showCompleted ? "expand_less" : "expand_more"} size={18} className="text-outline" />
                       </button>
-                    )}
-                    <button
-                      onClick={() => openEditModal(item)}
-                      className="p-1.5 text-outline hover:text-primary transition-colors"
-                      title="Edit / Reschedule Event"
-                    >
-                      <Icon name="edit" size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteItem(item)}
-                      className="p-1.5 text-outline hover:text-error transition-colors"
-                      title="Delete Event"
-                    >
-                      <Icon name="delete" size={16} />
-                    </button>
-                  </div>
-                </div>
 
-                {/* Expandable Key Focus & Notes */}
-                {isExpanded && item.notes && (
-                  <div className="pt-2 border-t border-outline-variant/15 text-xs text-outline leading-relaxed whitespace-pre-wrap bg-surface-container/30 p-3 rounded-xl">
-                    <p className="font-bold text-primary text-[11px] mb-1">Key Focus & Specific Notes:</p>
-                    {item.notes}
-                  </div>
-                )}
-              </div>
-            );
-          })
+                      {showCompleted && (
+                        <div className="space-y-2 pt-1">
+                          {completedItems.map(item => {
+                            const isExpanded = expandedNotesId === `${item.itemType}-${item.id}`;
+
+                            return (
+                              <div
+                                key={`${item.itemType}-${item.id}`}
+                                className="p-3 rounded-2xl border border-outline-variant/15 bg-surface-container/25 opacity-75 hover:opacity-100 transition-all space-y-2"
+                              >
+                                <div className="flex items-center justify-between gap-2.5">
+                                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <button
+                                      onClick={() => item.itemType === 'routine' ? toggleRoutine(item.id, item.completed) : toggleTask(item.id, item.completed)}
+                                      className="w-5 h-5 rounded-full bg-emerald-500 border-2 border-emerald-500 text-white flex items-center justify-center transition-all flex-shrink-0"
+                                    >
+                                      <Icon name="check" size={12} />
+                                    </button>
+
+                                    <div className="min-w-0 flex-1">
+                                      <p className="font-bold text-xs text-outline line-through leading-snug break-words">
+                                        {item.title}
+                                      </p>
+                                      <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-[10px] font-medium text-outline flex items-center gap-1">
+                                          <Icon name="schedule" size={10} /> {item.time} ({item.duration}m)
+                                        </span>
+                                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full border border-outline-variant/30 text-outline">
+                                          {item.type}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    {item.notes && (
+                                      <button
+                                        onClick={() => setExpandedNotesId(isExpanded ? null : `${item.itemType}-${item.id}`)}
+                                        className="p-1 text-outline hover:text-primary transition-colors"
+                                      >
+                                        <Icon name={isExpanded ? "expand_less" : "info"} size={15} />
+                                      </button>
+                                    )}
+                                    <button
+                                      onClick={() => openEditModal(item)}
+                                      className="p-1 text-outline hover:text-primary transition-colors"
+                                    >
+                                      <Icon name="edit" size={14} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteItem(item)}
+                                      className="p-1 text-outline hover:text-error transition-colors"
+                                    >
+                                      <Icon name="delete" size={14} />
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {isExpanded && item.notes && (
+                                  <div className="pt-2 border-t border-outline-variant/15 text-xs text-outline leading-relaxed whitespace-pre-wrap bg-surface-container/30 p-2 rounded-xl">
+                                    <p className="font-bold text-primary text-[10px] mb-1">Key Focus & Specific Notes:</p>
+                                    {item.notes}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </>
         )}
       </div>
 
@@ -483,6 +607,12 @@ export default function ScheduleTab() {
         onClose={() => setShowDatePicker(false)}
         selectedDate={selectedDate}
         onSelectDate={(d) => setSelectedDate(d)}
+      />
+
+      <MasterRoutineModal
+        isOpen={showMasterModal}
+        onClose={() => setShowMasterModal(false)}
+        onRoutinesSaved={() => loadSchedule()}
       />
     </div>
   );

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
+import QuickLoggerBar from '../components/ui/QuickLoggerBar';
+import LifeHealthDiagnosticCard from '../components/dashboard/LifeHealthDiagnosticCard';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
 import { 
   fetchCloudExpenses, 
@@ -26,6 +28,8 @@ export default function DashboardTab() {
   const [monthSpent, setMonthSpent] = useState(0);
   const [todaySpent, setTodaySpent] = useState(0);
   const [pendingItems, setPendingItems] = useState([]);
+  const [totalRoutines, setTotalRoutines] = useState(0);
+  const [routinesCompleted, setRoutinesCompleted] = useState(0);
   const [expiringPerks, setExpiringPerks] = useState([]);
   const [aiInsight, setAiInsight] = useState(null);
   const [streak, setStreak] = useState(null);
@@ -56,7 +60,11 @@ export default function DashboardTab() {
       computeCloudPortfolioNetWorth(),
     ]);
 
-    const uncompletedRoutines = (schedData.routines || [])
+    const routines = schedData.routines || [];
+    setTotalRoutines(routines.length);
+    setRoutinesCompleted(routines.filter(r => r.completed).length);
+
+    const uncompletedRoutines = routines
       .filter(r => !r.completed)
       .map(r => ({ ...r, id: r.id, itemType: 'routine', title: r.title, time: r.start || '08:00', tag: 'Habit Routine', color: 'text-emerald-400 bg-emerald-500/10' }));
 
@@ -116,6 +124,9 @@ export default function DashboardTab() {
           </div>
         </div>
 
+        {/* Quick Action Logger Bar (1-Tap Water Hydration & Quick Expense Input) */}
+        <QuickLoggerBar onExpenseLogged={loadHomeData} />
+
         {/* Card 1: Total Expense This Month */}
         <div
           onClick={() => navigate('/expenses')}
@@ -146,6 +157,17 @@ export default function DashboardTab() {
             </div>
           </div>
         </div>
+
+        {/* Life Strategy & Health Diagnostic Scorecard */}
+        <LifeHealthDiagnosticCard
+          routinesCompleted={routinesCompleted}
+          totalRoutines={totalRoutines}
+          todaySpent={todaySpent}
+          monthSpent={monthSpent}
+          streak={streak || 0}
+          pendingCount={pendingItems.length}
+          expiringPerksCount={expiringPerks ? expiringPerks.length : 0}
+        />
 
         {/* Card 2: Today's Pending Tasks & Events */}
         <div className="bg-surface-container-lowest rounded-3xl p-5 border border-outline-variant/30 shadow-card space-y-4">
@@ -252,3 +274,4 @@ export default function DashboardTab() {
     </div>
   );
 }
+

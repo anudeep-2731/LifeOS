@@ -540,3 +540,291 @@ export const migrateLocalDataToSupabase = async () => {
     console.error('Data migration error:', err);
   }
 };
+
+// ─── Master Daily Routine Blueprint & Auto-Population Engine ─────────────────
+
+export const DEFAULT_STARTER_ROUTINES = [
+  { start: '08:00', duration: 15, category: 'Morning Routine', title: 'Wake Up & Hydration', notes: 'Drink 2 glasses room-temperature water', days: ['Everyday'] },
+  { start: '08:15', duration: 25, category: 'Fitness & Spine', title: 'Targeted Back & Core Routine (25 min)', notes: 'Cat-Cow 10 reps & Cobra holds', days: ['Everyday'] },
+  { start: '09:15', duration: 30, category: 'Nutrition', title: 'Healthy Breakfast & Tea', notes: 'Nutritious breakfast & morning tea/coffee', days: ['Everyday'] },
+  { start: '10:00', duration: 210, category: 'Work', title: 'Deep Work Focus Block 1', notes: 'Focus work session with 50/50 posture stretch', days: ['Everyday'] },
+  { start: '13:30', duration: 45, category: 'Nutrition', title: 'Lunch Break & Posture Rest', notes: 'Mindful lunch break', days: ['Everyday'] },
+  { start: '19:00', duration: 60, category: 'Health', title: 'Evening Walk & Wind Down', notes: '30-minute brisk walk & posture release', days: ['Everyday'] },
+];
+
+export const ANUDEEP_WEEKLY_SKIN_HAIR_PROTOCOLS = {
+  Monday: {
+    morning: {
+      title: 'Morning Skin & Hair Care Protocol',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Rinse hair with plain water.\n2. Wash face with gentle cleanser.\n3. Apply Reginald Men\'s Sunscreen & Moisturizer.\n\n*Ground Rules:* Wash hair first, face last. Reginald Sunscreen in AM only.',
+      ingredients: ['Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Care Protocol (2% BHA)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face thoroughly with gentle cleanser.\n2. Wait until skin is dry, then apply 3–4 drops of Chemist at Play 2% BHA.\n3. Apply light gel moisturizer.\n\n*Ground Rules:* 2% BHA Mon/Wed/Fri nights only.',
+      ingredients: ['Gentle cleanser', 'Chemist at Play 2% BHA', 'Light gel moisturizer']
+    }
+  },
+  Tuesday: {
+    morning: {
+      title: 'Morning Skin Care Protocol',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Keep hair dry.\n2. Wash face with gentle cleanser.\n3. Apply Reginald Men\'s Sunscreen & Moisturizer.',
+      ingredients: ['Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Protocol (Barrier Recovery)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face with gentle cleanser.\n2. Apply light gel moisturizer.\n\n*(Skin Barrier Recovery — NO BHA tonight!)*',
+      ingredients: ['Gentle cleanser', 'Light gel moisturizer']
+    }
+  },
+  Wednesday: {
+    morning: {
+      title: 'Morning Hair Treatment & Skin Care',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Apply crushed fresh Hibiscus gel to hair lengths only.\n2. Massage Scalpe+ on scalp roots; leave for 5 full minutes.\n3. Rinse hair thoroughly.\n4. Wash face with gentle cleanser.\n5. Apply Reginald Men\'s Sunscreen & Moisturizer.',
+      ingredients: ['10–12 Hibiscus leaves', 'Scalpe+ shampoo', 'Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Care Protocol (2% BHA)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face thoroughly with gentle cleanser.\n2. Wait until dry; apply 3–4 drops of Chemist at Play 2% BHA.\n3. Apply light gel moisturizer.\n\n*(Put on a fresh clean pillowcase tonight!)*',
+      ingredients: ['Gentle cleanser', 'Chemist at Play 2% BHA', 'Light gel moisturizer', 'Clean pillowcase']
+    }
+  },
+  Thursday: {
+    morning: {
+      title: 'Morning Skin Care Protocol',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Keep hair dry.\n2. Wash face with gentle cleanser.\n3. Apply Reginald Men\'s Sunscreen & Moisturizer.',
+      ingredients: ['Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Protocol (Barrier Recovery)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face with gentle cleanser.\n2. Apply light gel moisturizer.\n\n*(Skin Barrier Recovery — NO BHA tonight!)*',
+      ingredients: ['Gentle cleanser', 'Light gel moisturizer']
+    }
+  },
+  Friday: {
+    morning: {
+      title: 'Morning Kunkudukaya Hair Wash & Skin Care',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Wash scalp with boiled & strained Kunkudukaya + Hibiscus water; rinse.\n2. Wash face with gentle cleanser.\n3. Apply Reginald Men\'s Sunscreen & Moisturizer.',
+      ingredients: ['4–5 Kunkudukaya shells', '5 Hibiscus leaves', 'Straining cloth', 'Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Care Protocol (2% BHA)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face thoroughly with gentle cleanser.\n2. Wait until dry; apply 3–4 drops of Chemist at Play 2% BHA.\n3. Apply light gel moisturizer.',
+      ingredients: ['Gentle cleanser', 'Chemist at Play 2% BHA', 'Light gel moisturizer']
+    }
+  },
+  Saturday: {
+    morning: {
+      title: 'Morning Skin Care Protocol',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Keep hair dry.\n2. Wash face with gentle cleanser.\n3. Apply Reginald Men\'s Sunscreen & Moisturizer.',
+      ingredients: ['Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Protocol (Barrier Recovery)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face with gentle cleanser.\n2. Apply light gel moisturizer.\n\n*(Skin Barrier Recovery — NO BHA tonight!)*',
+      ingredients: ['Gentle cleanser', 'Light gel moisturizer']
+    }
+  },
+  Sunday: {
+    morning: {
+      title: 'Morning Hair Treatment & Skin Care',
+      start: '08:40',
+      duration: 20,
+      category: 'Skin & Hair Care',
+      notes: '1. Apply crushed fresh Hibiscus gel to hair lengths only.\n2. Massage Scalpe+ on scalp roots; leave for 5 full minutes.\n3. Rinse hair thoroughly.\n4. Wash face with gentle cleanser.\n5. Apply Reginald Men\'s Sunscreen & Moisturizer.',
+      ingredients: ['10–12 Hibiscus leaves', 'Scalpe+ shampoo', 'Gentle cleanser', 'Reginald Sunscreen']
+    },
+    night: {
+      title: 'Night Skin Protocol (Barrier Recovery)',
+      start: '22:45',
+      duration: 15,
+      category: 'Skin Care',
+      notes: '1. Wash face with gentle cleanser.\n2. Apply light gel moisturizer.\n\n*(Skin Barrier Recovery — NO BHA. Put on a fresh clean pillowcase tonight!)*',
+      ingredients: ['Gentle cleanser', 'Light gel moisturizer', 'Clean pillowcase']
+    }
+  }
+};
+
+export const ANUDEEP_MASTER_ROUTINES = DEFAULT_STARTER_ROUTINES;
+
+export const fetchCloudMasterRoutines = async () => {
+  try {
+    const client = await getSupabase();
+    let key = 'master_routines_default';
+    if (client) {
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.user) key = `master_routines_${session.user.id}`;
+    }
+    const cached = await db.settings.get(key);
+    if (cached && Array.isArray(cached.value) && cached.value.length > 0) {
+      return cached.value;
+    }
+  } catch (err) {
+    console.error('Error fetching master routines:', err);
+  }
+  return DEFAULT_STARTER_ROUTINES;
+};
+
+export const saveCloudMasterRoutines = async (routinesList) => {
+  try {
+    const client = await getSupabase();
+    let key = 'master_routines_default';
+    if (client) {
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.user) key = `master_routines_${session.user.id}`;
+    }
+    await db.settings.put({ key, value: routinesList });
+  } catch (err) {
+    console.error('Error saving master routines:', err);
+  }
+  return routinesList;
+};
+
+export const autoPopulateDailyRoutines = async (selectedDate) => {
+  const client = await getSupabase();
+  if (!client) return [];
+  const { data: { session } } = await client.auth.getSession();
+  if (!session?.user) return [];
+
+  const userId = session.user.id;
+
+  try {
+    // Check if routines exist for selectedDate
+    const { data: existing, error } = await client
+      .from('schedule')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('date', selectedDate)
+      .eq('item_type', 'routine');
+
+    if (!error && existing && existing.length === 0) {
+      // Determine day of week name (Monday, Tuesday, etc.)
+      const d = new Date(selectedDate + 'T00:00:00');
+      const dayName = d.toLocaleDateString('en-US', { weekday: 'long' });
+      const dayShort = d.toLocaleDateString('en-US', { weekday: 'short' });
+
+      // Fetch base master routines
+      const baseMasterList = await fetchCloudMasterRoutines();
+      
+      // Filter base routines applicable to today
+      const applicableBase = baseMasterList.filter(r => {
+        if (!r.days || r.days.includes('Everyday') || r.days.length === 0) return true;
+        return r.days.includes(dayShort) || r.days.includes(dayName);
+      });
+
+      const payload = applicableBase.map(r => ({
+        user_id: userId,
+        item_type: 'routine',
+        date: selectedDate,
+        due_date: selectedDate,
+        title: r.title,
+        scheduled_time: r.start,
+        duration: Number(r.duration) || 15,
+        category: r.category || 'Morning Routine',
+        priority: 'High',
+        notes: r.notes || '',
+        completed: false,
+      }));
+
+      // Inject Anudeep's specific Weekly Skin & Hair Care protocols for today
+      const skinHairDayProtocol = ANUDEEP_WEEKLY_SKIN_HAIR_PROTOCOLS[dayName];
+      if (skinHairDayProtocol) {
+        if (skinHairDayProtocol.morning) {
+          payload.push({
+            user_id: userId,
+            item_type: 'routine',
+            date: selectedDate,
+            due_date: selectedDate,
+            title: skinHairDayProtocol.morning.title,
+            scheduled_time: skinHairDayProtocol.morning.start,
+            duration: skinHairDayProtocol.morning.duration,
+            category: skinHairDayProtocol.morning.category,
+            priority: 'High',
+            notes: skinHairDayProtocol.morning.notes + (skinHairDayProtocol.morning.ingredients ? `\n\n*Products/Ingredients Needed:* ${skinHairDayProtocol.morning.ingredients.join(', ')}` : ''),
+            completed: false,
+          });
+        }
+
+        if (skinHairDayProtocol.night) {
+          payload.push({
+            user_id: userId,
+            item_type: 'routine',
+            date: selectedDate,
+            due_date: selectedDate,
+            title: skinHairDayProtocol.night.title,
+            scheduled_time: skinHairDayProtocol.night.start,
+            duration: skinHairDayProtocol.night.duration,
+            category: skinHairDayProtocol.night.category,
+            priority: 'High',
+            notes: skinHairDayProtocol.night.notes + (skinHairDayProtocol.night.ingredients ? `\n\n*Products/Ingredients Needed:* ${skinHairDayProtocol.night.ingredients.join(', ')}` : ''),
+            completed: false,
+          });
+        }
+      }
+
+      await client.from('schedule').insert(payload);
+    }
+  } catch (err) {
+    console.error('Error auto-populating daily routines:', err);
+  }
+};
+
+// ─── Hydration / Water Tracker API ────────────────────────────────────────────
+
+export const fetchTodayWater = async (dateStr) => {
+  try {
+    const key = `water_${dateStr}`;
+    const item = await db.settings.get(key);
+    return item?.value || 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const addWaterIntake = async (amountMl, dateStr) => {
+  try {
+    const key = `water_${dateStr}`;
+    const current = await fetchTodayWater(dateStr);
+    const updated = current + amountMl;
+    await db.settings.put({ key, value: updated });
+    return updated;
+  } catch {
+    return 0;
+  }
+};

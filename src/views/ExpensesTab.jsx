@@ -29,26 +29,27 @@ function ExpenseRow({ expense, onDelete, onEdit, categories }) {
   const source = expense.paymentSource || 'HDFC Bank';
 
   return (
-    <div className="bg-surface-container-lowest rounded-2xl p-4 flex items-center gap-3.5 border border-outline-variant/20 shadow-sm hover:border-outline-variant/50 transition-all">
+    <div className="bg-surface-container-lowest rounded-2xl p-3.5 flex items-center gap-3 border border-outline-variant/20 shadow-sm hover:border-outline-variant/50 transition-all">
       <CategoryIcon category={expense.category} config={categories} />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
-          <p className="font-bold text-sm text-on-surface truncate">{expense.description}</p>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-surface-container-high text-outline flex-shrink-0">
-            {source}
-          </span>
-        </div>
-        <p className="text-xs text-outline mt-0.5">{expense.category} &bull; {dateDisplay} {expense.timestamp}</p>
+      <div className="flex-1 min-w-0 pr-1">
+        <p className="font-bold text-xs text-on-surface leading-snug break-words">{expense.description}</p>
+        <p className="text-[11px] text-outline mt-1 flex items-center gap-1.5 flex-wrap">
+          <span className="font-medium text-outline-high">{expense.category}</span>
+          <span>&bull;</span>
+          <span>{dateDisplay} {expense.timestamp}</span>
+          <span>&bull;</span>
+          <span className="font-bold text-primary/90 bg-primary/10 px-1.5 py-0.5 rounded">{source}</span>
+        </p>
       </div>
-      <div className="flex items-center gap-2 flex-shrink-0">
-        <span className="font-headline font-bold text-tertiary text-sm">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        <span className="font-headline font-extrabold text-tertiary text-xs sm:text-sm">
           −₹{expense.amount.toLocaleString()}
         </span>
         <button onClick={onEdit} className="text-outline hover:text-primary transition-colors p-1" aria-label="Edit expense">
-          <Icon name="edit" size={16} />
+          <Icon name="edit" size={15} />
         </button>
         <button onClick={onDelete} className="text-outline hover:text-error transition-colors p-1" aria-label="Delete expense">
-          <Icon name="delete" size={16} />
+          <Icon name="delete" size={15} />
         </button>
       </div>
     </div>
