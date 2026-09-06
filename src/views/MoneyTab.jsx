@@ -3,8 +3,13 @@ import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import SmartImportSheet from '../components/ui/SmartImportSheet';
 import FinanceSettingsSheet from '../components/ui/FinanceSettingsSheet';
+import HoldingModal from '../components/ui/HoldingModal';
+import ExecutiveOverviewSection from '../components/finance/ExecutiveOverviewSection';
+import MasterPortfolioSection from '../components/finance/MasterPortfolioSection';
+import STIMatrixSection from '../components/finance/STIMatrixSection';
+import GoalSimulatorsSection from '../components/finance/GoalSimulatorsSection';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials } from '../db/database';
+import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials, computePortfolioNetWorth, getExpiringPerks } from '../db/database';
 import { DEFAULT_CATEGORY, EMPTY_FORM } from '../lib/constants';
 import { downloadCSV } from '../lib/ExportUtils';
 
@@ -244,6 +249,14 @@ export default function MoneyTab() {
 
   const today = getTodayStr();
 
+  const [activeSubTab, setActiveSubTab] = useState('overview'); // 'overview' | 'portfolio' | 'sti' | 'budget' | 'simulators'
+  const [portfolio, setPortfolio] = useState({ liquid: 0, invested: 0, outside: 0, gold: 0, perks: 0, financialNetWorth: 0, combinedNetWorth: 0, holdings: [] });
+  const [expiringPerks, setExpiringPerks] = useState([]);
+  const [showHoldingModal, setShowHoldingModal] = useState(false);
+  const [editingHolding, setEditingHolding] = useState(null);
+  const [defaultHoldingGroup, setDefaultHoldingGroup] = useState('Liquid Funds');
+  const [showGSheetModal, setShowGSheetModal] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     
@@ -251,7 +264,7 @@ export default function MoneyTab() {
     await seedTodayData();
     await rolloverFinancials(selectedMonth);
 
-    const [b, c, cb, ec, ic, mc, br] = await Promise.all([
+    const [b, c, cb, ec, ic, mc, br, portData, expPerks] = await Promise.all([
       db.settings.get('monthlyBudget'),
       db.settings.get('investmentCategories'),
       db.settings.get('categoryBudgets'),
@@ -259,6 +272,8 @@ export default function MoneyTab() {
       db.settings.get('incomeCategories'),
       db.settings.get('emiCategories'),
       db.settings.get('budgetRules'),
+      computePortfolioNetWorth(),
+      getExpiringPerks(30),
     ]);
 
     if (b)  setBudget(b.value);
@@ -268,6 +283,9 @@ export default function MoneyTab() {
     if (ic) setIncomeCats(ic.value);
     if (mc) setEmiCats(mc.value);
     if (br) setBudgetRules(br.value);
+
+    setPortfolio(portData);
+    setExpiringPerks(expPerks);
 
     const year = selectedMonth.split('-')[0];
 
@@ -279,8 +297,6 @@ export default function MoneyTab() {
       db.emis.where('month').equals(selectedMonth).toArray(),
       db.expenses.filter(e => e.date.startsWith(year)).toArray(),
     ]);
-
-    console.log('Current Income:', currentIncome);
 
     monthExpenses.sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp));
     
@@ -294,6 +310,23 @@ export default function MoneyTab() {
     setDailyTotals(dTotals);
 
     setLoading(false);
+  };
+
+  const handleOpenAddHolding = (groupName = 'Liquid Funds') => {
+    setEditingHolding(null);
+    setDefaultHoldingGroup(groupName);
+    setShowHoldingModal(true);
+  };
+
+  const handleEditHolding = (item) => {
+    setEditingHolding(item);
+    setDefaultHoldingGroup(item.group || 'Liquid Funds');
+    setShowHoldingModal(true);
+  };
+
+  const handleDeleteHolding = async (id) => {
+    await db.holdings.delete(id);
+    loadData();
   };
 
   const handleQuickAdd = async (e) => {
@@ -467,12 +500,29 @@ export default function MoneyTab() {
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const maxDaily = Math.max(...Object.values(dailyTotals), 1);
 
-  return (
-    <div className="flex flex-col min-h-screen">
+  const handleExportCombinedCSV = () => {
+    const data = [
+      ...portfolio.holdings.map(h => ({ Type: 'Holding', Group: h.group, Category: h.type, Platform: h.platform, Amount: h.amount, Date: h.date, Expiry: h.expiry })),
+      ...expenses.map(e => ({ Type: 'Expense', Group: 'Budget Ledger', Category: e.category, Platform: e.paymentMode || 'UPI', Amount: e.amount, Date: e.date, Notes: e.description })),
+    ];
+    downloadCSV(`finance_portfolio_ledger_${selectedMonth}.csv`, data);
+  };
 
-      {/* Header */}
-      <div className="pt-6 px-4 sm:px-6 pb-4 bg-surface-container-low">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+  const subTabs = [
+    { id: 'overview', label: 'Overview', icon: 'pie_chart' },
+    { id: 'portfolio', label: 'Portfolio', icon: 'account_balance' },
+    { id: 'sti', label: 'STI Matrix', icon: 'bolt' },
+    { id: 'budget', label: 'Budget', icon: 'receipt_long' },
+    { id: 'simulators', label: 'Simulators', icon: 'trending_up' },
+  ];
+
+  return (
+    <div className="flex flex-col min-h-screen pb-28">
+
+      {/* Top Action & Navigation Header */}
+      <div className="pt-4 px-4 sm:px-6 pb-3 bg-surface-container-low border-b border-outline-variant/20 sticky top-16 z-30 backdrop-blur-md">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-3">
+          {/* Month Selector */}
           <div className="flex items-center justify-between w-full sm:w-auto gap-1">
             <button
               onClick={() => {
@@ -480,10 +530,11 @@ export default function MoneyTab() {
                 const d = new Date(y, m - 2, 1);
                 setSelectedMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
               }}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:bg-surface-container transition-all active:scale-90">
+              className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:bg-surface-container transition-all active:scale-90"
+            >
               <Icon name="chevron_left" size={20} />
             </button>
-            <span className="text-lg font-headline font-bold text-on-surface min-w-[120px] text-center">
+            <span className="text-base font-headline font-bold text-on-surface min-w-[130px] text-center">
               {new Date(selectedMonth + '-01').toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}
             </span>
             <button
@@ -494,370 +545,216 @@ export default function MoneyTab() {
                 if (next <= getMonthStr()) setSelectedMonth(next);
               }}
               disabled={selectedMonth >= getMonthStr()}
-              className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:bg-surface-container transition-all active:scale-90 disabled:opacity-30">
+              className="w-8 h-8 rounded-full flex items-center justify-center text-outline hover:bg-surface-container transition-all active:scale-90 disabled:opacity-30"
+            >
               <Icon name="chevron_right" size={20} />
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleExport}
-              className="flex items-center gap-1.5 bg-surface-container text-outline-variant text-xs font-semibold rounded-full px-3 py-2 hover:bg-surface-container-high transition-all active:scale-95">
-              <Icon name="download" size={14} />
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-1.5 flex-wrap justify-end w-full sm:w-auto">
+            <button
+              onClick={() => setShowGSheetModal(true)}
+              className="flex items-center gap-1.5 bg-surface-container text-primary text-xs font-semibold rounded-full px-3 py-1.5 hover:bg-surface-container-high transition-all active:scale-95 border border-primary/20"
+              title="Sync Google Sheets CSV"
+            >
+              <Icon name="sync" size={14} />
+              <span className="hidden sm:inline">GSheet Sync</span>
             </button>
-            <button onClick={() => setShowSettings(true)}
-              className="flex items-center gap-1.5 bg-surface-container text-outline-variant text-xs font-semibold rounded-full px-3 py-2 hover:bg-surface-container-high transition-all active:scale-95">
+            <button
+              onClick={handleExportCombinedCSV}
+              className="flex items-center gap-1.5 bg-surface-container text-outline-variant text-xs font-semibold rounded-full px-3 py-1.5 hover:bg-surface-container-high transition-all active:scale-95"
+              title="Export CSV"
+            >
+              <Icon name="download" size={14} />
+              <span className="hidden sm:inline">Export</span>
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-1.5 bg-surface-container text-outline-variant text-xs font-semibold rounded-full px-3 py-1.5 hover:bg-surface-container-high transition-all active:scale-95"
+              title="Settings"
+            >
               <Icon name="tune" size={14} />
             </button>
-            <button onClick={() => setShowImport(true)}
-              className="flex items-center gap-2 bg-primary-fixed text-on-primary-fixed-variant text-xs font-semibold rounded-full px-4 py-2 hover:bg-primary-fixed-dim transition-all active:scale-95">
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-1.5 bg-primary-fixed text-on-primary-fixed-variant text-xs font-semibold rounded-full px-3 py-1.5 hover:bg-primary-fixed-dim transition-all active:scale-95"
+            >
               <Icon name="auto_awesome" size={14} />
               Import
             </button>
           </div>
         </div>
 
-        {/* Tab Navigation */}
-        <div className="flex bg-surface-container-high rounded-full p-1 mt-2">
-          {['Tracker', 'Dashboard', 'Analysis'].map(tab => (
-            <button key={tab} onClick={() => setActiveTab(tab)}
-              className={cn('flex-1 py-1.5 text-[11px] font-bold rounded-full transition-all', 
-                activeTab === tab ? 'bg-surface shadow-sm text-primary' : 'text-outline hover:text-on-surface')}>
-              {tab}
+        {/* Sub-Navigation Tabs with Material Symbols Icons */}
+        <div className="flex bg-surface-container-high rounded-xl p-1 gap-1 overflow-x-auto no-scrollbar">
+          {subTabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id)}
+              className={cn(
+                'px-3 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap flex-1 text-center flex items-center justify-center gap-1.5',
+                activeSubTab === tab.id
+                  ? 'bg-surface shadow-sm text-primary font-bold'
+                  : 'text-outline hover:text-on-surface'
+              )}
+            >
+              <Icon name={tab.icon} size={16} />
+              <span>{tab.label}</span>
             </button>
           ))}
         </div>
       </div>
 
-      {activeTab === 'Dashboard' && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 pb-24">
-          {/* Monthly Health Overview */}
-          <div className="mx-4 mt-4 grid grid-cols-2 gap-3">
-            <div className="card-floating p-4 bg-primary/5 border-primary/10 relative group">
-              <div className="flex justify-between items-start mb-1">
-                <p className="text-[10px] text-outline uppercase font-bold tracking-wider">Total Income</p>
-                <button onClick={() => setIsPrivate(!isPrivate)} className="text-outline-variant hover:text-primary transition-colors">
-                  <Icon name={isPrivate ? "visibility_off" : "visibility"} size={14} />
-                </button>
-              </div>
-              <p className="text-xl font-headline font-extrabold text-primary">
-                {isPrivate ? '₹••••' : `₹${totalIncome.toLocaleString()}`}
-              </p>
-            </div>
-            <div className="card-floating p-4 bg-tertiary/5 border-tertiary/10">
-              <p className="text-[10px] text-outline uppercase font-bold tracking-wider mb-1">Net Balance</p>
-              <p className={cn("text-xl font-headline font-extrabold", healthColor)}>
-                {isPrivate ? '₹••••' : `₹${netBalance.toLocaleString()}`}
-              </p>
-            </div>
-          </div>
+      {/* Main Tab Content */}
+      <div className="px-4 sm:px-6 pt-5">
+        {/* 1. Executive Overview Sub-Tab */}
+        {activeSubTab === 'overview' && (
+          <ExecutiveOverviewSection
+            portfolio={portfolio}
+            expiringPerks={expiringPerks}
+            onNavigateToPerks={() => setActiveSubTab('portfolio')}
+            onOpenAddHolding={handleOpenAddHolding}
+          />
+        )}
 
-          <div className="mx-4 mt-6">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">50/30/20 Rule Breakdown</span>
-              <span className="text-[10px] font-bold text-outline-variant bg-surface-container-high px-2 py-0.5 rounded">
-                {budgetRules.needs}/{budgetRules.wants}/{budgetRules.savings}
-              </span>
+        {/* 2. Master Sheet Portfolio Sub-Tab */}
+        {activeSubTab === 'portfolio' && (
+          <MasterPortfolioSection
+            holdings={portfolio.holdings}
+            onAddHolding={handleOpenAddHolding}
+            onEditHolding={handleEditHolding}
+            onDeleteHolding={handleDeleteHolding}
+          />
+        )}
+
+        {/* 3. STI Decision Matrix Sub-Tab */}
+        {activeSubTab === 'sti' && <STIMatrixSection />}
+
+        {/* 4. SIP & Goal Simulators Sub-Tab */}
+        {activeSubTab === 'simulators' && <GoalSimulatorsSection />}
+
+        {/* 5. Month-Wise Budget & Ledger Sub-Tab */}
+        {activeSubTab === 'budget' && (
+          <div className="space-y-6">
+            {/* Quick Natural Language Add */}
+            <div className="card-floating p-2.5 flex items-center gap-2">
+              <Icon name="bolt" size={18} className="text-primary ml-1 flex-shrink-0" />
+              <input
+                type="text"
+                className="w-full bg-transparent text-xs text-on-surface placeholder:text-outline focus:outline-none"
+                placeholder="Quick add expense (e.g. 450 Coffee & Snacks)..."
+                value={nlInput}
+                onChange={(e) => setNlInput(e.target.value)}
+                onKeyDown={handleQuickAdd}
+                disabled={isNlProcessing}
+              />
+              {isNlProcessing && <Icon name="sync" size={16} className="animate-spin text-primary mr-1" />}
             </div>
-            {renderProgress(needsSpent, needsBudget, 'bg-error', 'Needs (50%)')}
-            {renderProgress(wantsSpent, wantsBudget, 'bg-tertiary', 'Wants (30%)')}
-            {renderProgress(savingsSpent, savingsBudget, 'bg-secondary', 'Savings (20%)')}
-          </div>
-          
-          {/* Monthly spending progress bar card */}
-          <div className="mx-4 mt-4 card-floating overflow-hidden">
-            <div className="p-6">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <p className="text-xs text-outline uppercase tracking-wider mb-1">Expense Budget</p>
-                  <p className="text-4xl font-headline font-extrabold text-on-surface leading-tight">
-                    &#8377;{monthSpent.toLocaleString()}
-                  </p>
+
+            {/* Monthly Health & Budget Summary */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="card-floating p-4 bg-primary/5 border-primary/10 relative group">
+                <div className="flex justify-between items-start mb-1">
+                  <p className="text-[10px] text-outline uppercase font-bold tracking-wider">Total Income</p>
+                  <button onClick={() => setIsPrivate(!isPrivate)} className="text-outline-variant hover:text-primary transition-colors">
+                    <Icon name={isPrivate ? "visibility_off" : "visibility"} size={14} />
+                  </button>
                 </div>
-                <div className="text-right">
-                  <p className="text-xs text-outline uppercase tracking-wider mb-1">Allowance</p>
-                  <p className="text-xl font-headline font-bold text-secondary">
-                    &#8377;{Math.floor(dailyAllowance).toLocaleString()}<span className="text-xs text-outline">/day</span>
-                  </p>
-                </div>
-              </div>
-
-              <div className="w-full h-3 bg-outline-variant/30 rounded-full overflow-hidden mb-2 mt-4">
-                <div className={cn('h-full rounded-full transition-all duration-1000', barColor)} style={{ width: `${pct}%` }} />
-              </div>
-              <div className="flex justify-between text-[11px] font-bold text-outline-variant">
-                <span>{pct.toFixed(0)}% OF BUDGET</span>
-                <span>₹{remaining.toLocaleString()} LEFT</span>
-              </div>
-            </div>
-
-            <div className="bg-surface-container-high px-6 py-3 flex justify-between items-center">
-              <span className="text-xs font-semibold text-outline">Spent Today</span>
-              <span className="text-sm font-headline font-bold text-on-surface">₹{todaySpent.toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Analysis' && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 pb-24">
-          {/* Monthly Sections (Income, EMIs, Investments) */}
-          <div className="mx-4 mt-6 space-y-6">
-            {/* Income */}
-            <div>
-              <button onClick={() => setIncomeCollapsed(!incomeCollapsed)} className="flex items-center justify-between w-full mb-3 px-1 hover:bg-surface-container-highest/20 rounded-lg transition-all py-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly Income</span>
-                  <Icon name={incomeCollapsed ? "expand_more" : "expand_less"} size={16} className="text-outline-variant" />
-                </div>
-                <span className="text-xs font-bold text-primary">
+                <p className="text-xl font-headline font-extrabold text-primary">
                   {isPrivate ? '₹••••' : `₹${totalIncome.toLocaleString()}`}
-                </span>
-              </button>
-              {!incomeCollapsed && (
-                <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {incomeCats.map(cat => {
-                    const existing = income.find(i => i.category === cat);
-                    return (
-                      <MonthlyItemInput key={`income-${cat}-${selectedMonth}`} type="income" category={cat} date={selectedMonth}
-                        defaultValue={existing?.amount || 0} onSave={loadData} colorClass="text-primary" bgClass="bg-primary/5" borderClass="border-primary/20"
-                        hideAmount={isPrivate} />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* EMIs */}
-            <div>
-              <button onClick={() => setEmiCollapsed(!emiCollapsed)} className="flex items-center justify-between w-full mb-3 px-1 hover:bg-surface-container-highest/20 rounded-lg transition-all py-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly EMIs</span>
-                  <Icon name={emiCollapsed ? "expand_more" : "expand_less"} size={16} className="text-outline-variant" />
-                </div>
-                <span className="text-xs font-bold text-error">₹{totalEmis.toLocaleString()}</span>
-              </button>
-              {!emiCollapsed && (
-                <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {emiCats.map(cat => {
-                    const existing = emis.find(e => e.category === cat);
-                    return (
-                      <MonthlyItemInput key={`emi-${cat}-${selectedMonth}`} type="emi" category={cat} date={selectedMonth}
-                        defaultValue={existing?.amount || 0} onSave={loadData} colorClass="text-error" bgClass="bg-error/5" borderClass="border-error/20" />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Investments */}
-            <div>
-              <button onClick={() => setInvestmentsCollapsed(!investmentsCollapsed)} className="flex items-center justify-between w-full mb-3 px-1 hover:bg-surface-container-highest/20 rounded-lg transition-all py-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Monthly Investments</span>
-                  <Icon name={investmentsCollapsed ? "expand_more" : "expand_less"} size={16} className="text-outline-variant" />
-                </div>
-                <span className="text-xs font-bold text-secondary">₹{totalInvest.toLocaleString()}</span>
-              </button>
-              {!investmentsCollapsed && (
-                <div className="grid grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {investCats.map(cat => {
-                    const existing = investments.find(inv => inv.category === cat);
-                    return (
-                      <MonthlyItemInput key={`invest-${cat}-${selectedMonth}`} type="investment" category={cat} date={selectedMonth}
-                        defaultValue={existing?.amount || 0} onSave={loadData} colorClass="text-secondary" bgClass="bg-secondary/5" borderClass="border-secondary/20" />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Category breakdown — with budget bars */}
-          <div className="mx-4 mt-6">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Category Budgets</span>
-            </div>
-            {Object.keys(catTotals).length === 0 ? (
-              <p className="text-xs text-outline mt-2 italic px-1">No transactions in {selectedMonth.split('-')[1]}/{selectedMonth.split('-')[0]}</p>
-            ) : (
-              <div className="space-y-2">
-                {Object.entries(catTotals).map(([cat, spent]) => {
-                  const catBudget = categoryBudgets[cat] || 0;
-                  const catPct    = catBudget > 0 ? Math.min((spent / catBudget) * 100, 100) : 0;
-                  const catColor  = catPct > 90 ? 'bg-error' : catPct > 70 ? 'bg-tertiary' : 'bg-primary';
-                  const cfg       = categories.find(c => c.name === cat) || { icon: 'more_horiz', color: 'text-outline', bg: 'bg-surface-container' };
-                  return (
-                    <div key={cat} className="card-floating p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <div className={cn('w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0', cfg.bg)}>
-                            <Icon name={cfg.icon} size={14} className={cfg.color} />
-                          </div>
-                          <span className="text-sm font-semibold text-on-surface">{cat}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-sm font-headline font-bold text-on-surface">₹{spent.toLocaleString()}</span>
-                          {catBudget > 0 && (
-                            <span className="text-xs text-outline ml-1">/ ₹{catBudget.toLocaleString()}</span>
-                          )}
-                        </div>
-                      </div>
-                      {catBudget > 0 && (
-                        <div className="w-full h-1.5 bg-outline-variant/20 rounded-full overflow-hidden">
-                          <div className={cn('h-full rounded-full transition-all', catColor)} style={{ width: `${catPct}%` }} />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                </p>
               </div>
-            )}
-          </div>
-
-          {/* Weekly Analysis */}
-          <div className="mx-4 mt-6">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Weekly Breakdown</span>
-            </div>
-            <div className="card-floating p-4">
-              <div className="flex h-32 items-end gap-2">
-                {Object.entries(weeklyTotals).map(([week, spent]) => {
-                  const heightPct = Math.max((spent / maxWeek) * 100, 5);
-                  return (
-                    <div key={week} className="flex-1 flex flex-col justify-end items-center group h-full">
-                      <span className="text-[10px] font-bold text-primary mb-1 opacity-0 group-hover:opacity-100 transition-opacity">₹{spent}</span>
-                      <div className="w-full bg-primary/20 hover:bg-primary/40 rounded-t-sm transition-all relative" style={{ height: `${heightPct}%` }}>
-                        <div className="absolute bottom-0 w-full bg-primary/40 rounded-t-sm" style={{ height: '2px' }} />
-                      </div>
-                      <span className="text-[10px] text-outline mt-2 truncate w-full text-center">{week.split(' ')[1]}</span>
-                    </div>
-                  );
-                })}
+              <div className="card-floating p-4 bg-tertiary/5 border-tertiary/10">
+                <p className="text-[10px] text-outline uppercase font-bold tracking-wider mb-1">Net Balance</p>
+                <p className={cn("text-xl font-headline font-extrabold", healthColor)}>
+                  {isPrivate ? '₹••••' : `₹${netBalance.toLocaleString()}`}
+                </p>
               </div>
             </div>
-          </div>
 
-          {/* Yearly Analysis */}
-          <div className="mx-4 mt-6">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">{selectedMonth.split('-')[0]} Daily Heatmap</span>
-            </div>
-            <div className="card-floating p-4 overflow-x-auto custom-scrollbar">
-              <div className="flex gap-4 min-w-max pb-2">
-                {monthNames.map((m, i) => {
-                  const monthStr = `${selectedMonth.split('-')[0]}-${String(i + 1).padStart(2, '0')}`;
-                  const daysInMonth = new Date(selectedMonth.split('-')[0], i + 1, 0).getDate();
-                  const daysArray = Array.from({ length: daysInMonth }, (_, k) => String(k + 1).padStart(2, '0'));
-                  
-                  return (
-                    <div key={m} className="flex flex-col gap-1">
-                      <span className="text-[10px] text-outline font-semibold mb-1">{m}</span>
-                      <div className="grid grid-rows-7 grid-flow-col gap-1">
-                        {daysArray.map(d => {
-                          const dateStr = `${monthStr}-${d}`;
-                          const spent = dailyTotals[dateStr] || 0;
-                          const intensity = spent > 0 ? Math.max((spent / maxDaily) * 100, 20) : 0;
-                          
-                          return (
-                            <div 
-                              key={d} 
-                              className={cn("w-3 h-3 rounded-sm transition-all cursor-pointer relative", 
-                                spent > 0 ? 'bg-primary' : 'bg-surface-container')}
-                              style={{ opacity: spent > 0 ? (intensity / 100) : 1 }}
-                              title={`${dateStr}: ₹${spent.toLocaleString()}`}
-                            />
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'Tracker' && (
-        <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 flex-1 px-4 pt-6 pb-24">
-          {/* Quick text log */}
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Quick Log</span>
-          </div>
-          <div className="relative mb-6">
-            <input
-              type="text"
-              className="input-pill w-full pl-12 pr-4 py-4 text-sm bg-surface-container-low border-surface-container-highest focus:bg-surface-container overflow-hidden shadow-inner"
-              placeholder="e.g. 250 for lunch or spent 1200 on fuel"
-              value={nlInput}
-              onChange={e => setNlInput(e.target.value)}
-              onKeyDown={handleQuickAdd}
-              disabled={isNlProcessing}
-            />
-            <div className="absolute left-4 top-1/2 -translate-y-1/2">
-              <Icon name={isNlProcessing ? 'sync' : 'auto_awesome'} size={18}
-                className={cn('text-primary', isNlProcessing && 'animate-spin')} />
-            </div>
-            {nlInput && !isNlProcessing && (
-              <button onClick={() => handleQuickAdd({ key: 'Enter' })}
-                className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center active:scale-90 transition-all">
-                <Icon name="arrow_forward" size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Date-grouped transactions */}
-          <div className="flex items-center justify-between mb-3 px-1">
-            <span className="text-xs font-bold uppercase tracking-widest text-outline-variant">Transactions</span>
-            {!loading && <span className="text-xs text-outline">{expenses.length} items</span>}
-          </div>
-
-          {loading && <p className="text-center text-outline text-sm pt-8 animate-pulse">Loading...</p>}
-
-          {!loading && expenses.length === 0 && (
-            <div className="flex flex-col items-center justify-center pt-16 text-outline">
-              <Icon name="account_balance_wallet" size={40} className="mb-3 opacity-30" />
-              <p className="text-sm">No transactions yet.</p>
-            </div>
-          )}
-
-          {!loading && (() => {
-            const groups = expenses.reduce((acc, e) => {
-              if (!acc[e.date]) acc[e.date] = { date: e.date, items: [], total: 0 };
-              acc[e.date].items.push(e);
-              acc[e.date].total += e.amount;
-              return acc;
-            }, {});
-            return Object.values(groups)
-              .sort((a, b) => b.date.localeCompare(a.date))
-              .map(group => {
-                const isToday = group.date === today;
-                const isYesterday = group.date === (() => {
-                  const d = new Date(); d.setDate(d.getDate() - 1);
-                  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                })();
-                const label = isToday ? 'Today' : isYesterday ? 'Yesterday'
-                  : new Date(group.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
-                return (
-                  <div key={group.date} className="mb-5">
-                    <div className="flex items-center justify-between mb-2 px-1">
-                      <span className="text-xs font-bold text-outline uppercase tracking-wider">{label}</span>
-                      <span className="text-xs font-bold text-tertiary">−₹{group.total.toLocaleString()}</span>
-                    </div>
-                    <div className="space-y-2">
-                      {group.items.map(e => (
-                        <ExpenseRow key={e.id} expense={e} categories={categories}
-                          onDelete={() => handleDelete(e)}
-                          onEdit={() => setEditExpense(e)} />
-                      ))}
-                    </div>
+            {/* Expense Budget Card */}
+            <div className="card-floating overflow-hidden">
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <p className="text-xs text-outline uppercase tracking-wider mb-1">Month Expenses Spent</p>
+                    <p className="text-3xl font-headline font-extrabold text-on-surface leading-tight">
+                      ₹{monthSpent.toLocaleString()}
+                    </p>
                   </div>
-                );
-              });
-          })()}
-        </div>
-      )}
+                  <div className="text-right">
+                    <p className="text-xs text-outline uppercase tracking-wider mb-1">Allowance</p>
+                    <p className="text-lg font-headline font-bold text-secondary">
+                      ₹{Math.floor(dailyAllowance).toLocaleString()}<span className="text-xs text-outline">/day</span>
+                    </p>
+                  </div>
+                </div>
 
-      {/* Undo delete toast */}
+                <div className="w-full h-2.5 bg-outline-variant/30 rounded-full overflow-hidden mb-2 mt-3">
+                  <div className={cn('h-full rounded-full transition-all duration-1000', barColor)} style={{ width: `${pct}%` }} />
+                </div>
+                <div className="flex justify-between text-[11px] font-bold text-outline-variant">
+                  <span>{pct.toFixed(0)}% OF BUDGET (₹{budget.toLocaleString()})</span>
+                  <span>₹{remaining.toLocaleString()} LEFT</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Expenses List */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between px-1">
+                <h3 className="font-headline font-bold text-sm text-on-surface">Transactions Ledger</h3>
+                <span className="text-xs text-outline">{expenses.length} Entries</span>
+              </div>
+
+              {!loading && expenses.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-12 text-outline">
+                  <Icon name="account_balance_wallet" size={36} className="mb-2 opacity-30" />
+                  <p className="text-sm">No transactions logged for this month.</p>
+                </div>
+              )}
+
+              {!loading && (() => {
+                const groups = expenses.reduce((acc, e) => {
+                  if (!acc[e.date]) acc[e.date] = { date: e.date, items: [], total: 0 };
+                  acc[e.date].items.push(e);
+                  acc[e.date].total += e.amount;
+                  return acc;
+                }, {});
+                return Object.values(groups)
+                  .sort((a, b) => b.date.localeCompare(a.date))
+                  .map(group => {
+                    const isToday = group.date === today;
+                    const isYesterday = group.date === (() => {
+                      const d = new Date(); d.setDate(d.getDate() - 1);
+                      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                    })();
+                    const label = isToday ? 'Today' : isYesterday ? 'Yesterday'
+                      : new Date(group.date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+                    return (
+                      <div key={group.date} className="mb-4">
+                        <div className="flex items-center justify-between mb-2 px-1">
+                          <span className="text-xs font-bold text-outline uppercase tracking-wider">{label}</span>
+                          <span className="text-xs font-bold text-tertiary">−₹{group.total.toLocaleString()}</span>
+                        </div>
+                        <div className="space-y-2">
+                          {group.items.map(e => (
+                            <ExpenseRow key={e.id} expense={e} categories={categories}
+                              onDelete={() => handleDelete(e)}
+                              onEdit={() => setEditExpense(e)} />
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+              })()}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Undo Delete Toast */}
       {undoVisible && pendingDelete && (
         <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3 bg-on-surface text-surface text-sm font-semibold px-5 py-3 rounded-full shadow-xl animate-in fade-in slide-in-from-bottom-4 duration-200">
           <span>Expense deleted</span>
@@ -865,14 +762,32 @@ export default function MoneyTab() {
         </div>
       )}
 
-      {/* FAB */}
-      <button onClick={() => setShowForm(true)}
-        className="fixed bottom-[100px] right-6 w-14 h-14 rounded-full primary-gradient text-white shadow-gradient flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
-        aria-label="Add expense">
-        <Icon name="add" size={28} filled className="text-white" />
-      </button>
+      {/* Action FAB */}
+      <div className="fixed bottom-[95px] right-6 flex flex-col items-end gap-2.5 z-40">
+        <button
+          onClick={() => handleOpenAddHolding()}
+          className="px-4 py-2.5 rounded-full bg-surface-container-high border border-primary/30 text-primary font-bold text-xs shadow-lg flex items-center gap-1.5 hover:scale-105 active:scale-95 transition-all"
+        >
+          <Icon name="add" size={16} /> Add Holding
+        </button>
+        <button
+          onClick={() => setShowForm(true)}
+          className="w-14 h-14 rounded-full primary-gradient text-white shadow-gradient flex items-center justify-center hover:scale-105 active:scale-95 transition-all"
+          aria-label="Add expense"
+        >
+          <Icon name="add" size={28} filled className="text-white" />
+        </button>
+      </div>
 
-      {/* Sheets */}
+      {/* Bottom Sheets & Modals */}
+      <HoldingModal
+        isOpen={showHoldingModal}
+        onClose={() => setShowHoldingModal(false)}
+        initialData={editingHolding}
+        defaultGroup={defaultHoldingGroup}
+        onSave={loadData}
+      />
+
       <BottomSheet isOpen={showForm} onClose={() => setShowForm(false)} title="Add Expense">
         <ExpenseForm onSave={loadData} onClose={() => setShowForm(false)} categories={categories} />
       </BottomSheet>

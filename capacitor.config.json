@@ -1,0 +1,12 @@
+{
+  "appId": "com.anudeep.lifeos",
+  "appName": "Life OS Companion",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "plugins": {
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0b0f19"
+    }
+  }
+}

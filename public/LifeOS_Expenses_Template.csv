@@ -1,0 +1,5 @@
+Date,Timestamp,Amount,Category,Description,PaymentSource,Notes
+2026-09-06,08:30,450,Food,Coffee & Breakfast,HDFC Bank,Morning cafe
+2026-09-06,13:30,120,Dining,Lunch Majjiga & Thali,Cash in Hand,Local restaurant
+2026-09-05,18:00,1200,Shopping,Grocery & Essentials,Credit Card,Supermarket
+2026-09-04,09:15,350,Transport,Fuel / Cab fare,SBI Bank,Commute

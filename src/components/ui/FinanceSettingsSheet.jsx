@@ -16,6 +16,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
   const [newInc, setNewInc] = useState('');
   const [newEmi, setNewEmi] = useState('');
   
+  const [gSheetUrl, setGSheetUrl] = useState('');
   const [categoryBudgets, setCategoryBudgets] = useState({});
   const [budgetRules, setBudgetRules] = useState({ needs: 50, wants: 30, savings: 20 });
 
@@ -24,7 +25,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
   }, [isOpen]);
 
   const loadSettings = async () => {
-    const [b, ec, ic, inc, em, cb, br] = await Promise.all([
+    const [b, ec, ic, inc, em, cb, br, gsheet] = await Promise.all([
       db.settings.get('monthlyBudget'),
       db.settings.get('expenseCategories'),
       db.settings.get('investmentCategories'),
@@ -32,6 +33,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
       db.settings.get('emiCategories'),
       db.settings.get('categoryBudgets'),
       db.settings.get('budgetRules'),
+      db.settings.get('google_sheet_url'),
     ]);
 
     if (b) setBudget(b.value);
@@ -41,6 +43,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
     if (em) setEmiCategories(em.value || []);
     if (cb) setCategoryBudgets(cb.value || {});
     if (br) setBudgetRules(br.value || { needs: 50, wants: 30, savings: 20 });
+    if (gsheet) setGSheetUrl(gsheet.value || '');
   };
 
   const handleSave = async () => {
@@ -52,6 +55,7 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
       db.settings.put({ key: 'emiCategories', value: emiCategories }),
       db.settings.put({ key: 'categoryBudgets', value: categoryBudgets }),
       db.settings.put({ key: 'budgetRules', value: budgetRules }),
+      db.settings.put({ key: 'google_sheet_url', value: gSheetUrl.trim() }),
     ]);
     window.dispatchEvent(new CustomEvent('life-os:settings-saved'));
     onSave();

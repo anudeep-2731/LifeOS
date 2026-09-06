@@ -115,6 +115,47 @@ db.version(10).stores({
   userStats: 'key',
 });
 
+// Version 12: Add paymentSource field to expenses
+db.version(12).stores({
+  wellbeingLogs: '++id, date, type, timestamp, value, note',
+  tasks: '++id, date, dueDate, title, duration, priority, postponeCount, completed, scheduledTime, recurring',
+  expenses: '++id, date, timestamp, amount, category, description, paymentSource, emailBody',
+  routines: '++id, date, title, start, duration, type, completed, taskId',
+  meals: '++id, date, day, mealType, title, completed, calories',
+  energyLogs: '++id, date, time, level, tag, note',
+  settings: 'key',
+  investments: '++id, month, category, amount, note',
+  income: '++id, month, category, amount, note',
+  emis: '++id, month, category, amount, note',
+  habitTemplates: '++id, title, startTime, duration, type, active',
+  groceryItems: '++id, weekStart, name, checked',
+  nutritionCategories: '++id, name, frequency, userFrequency, priority, colorKey, order, active',
+  nutritionLogs: '++id, date, categoryId',
+  weeklySchedule: '++id, weekStart, categoryId',
+  userStats: 'key',
+  holdings: '++id, group, type, platform, amount, date, expiry',
+});
+
+/**
+ * Adjusts liquid holding balance in db.holdings when an expense is logged or deleted.
+ * E.g., if paymentSource is 'HDFC Bank', 'SBI Bank', or 'Cash in Hand',
+ * amountDelta = -450 will deduct 450 from that liquid fund holding.
+ */
+export const adjustHoldingBalance = async (paymentSource, amountDelta) => {
+  if (!paymentSource || paymentSource === 'Credit Card' || paymentSource === 'Other') return;
+
+  const holdings = await db.holdings.where('group').equals('Liquid Funds').toArray();
+  const match = holdings.find(h => 
+    h.platform.toLowerCase().includes(paymentSource.toLowerCase()) ||
+    h.type.toLowerCase().includes(paymentSource.toLowerCase())
+  );
+
+  if (match) {
+    const newAmt = Math.max(0, (Number(match.amount) || 0) + amountDelta);
+    await db.holdings.update(match.id, { amount: newAmt });
+  }
+};
+
 // ─── Date helpers ────────────────────────────────────────────────────────────
 
 export const getTodayStr = () => {
@@ -393,6 +434,101 @@ export const seedTodayData = async () => {
 
   const rank = await db.userStats.get('rank');
   if (!rank) await db.userStats.put({ key: 'rank', value: 'Initiate' });
+
+  // Seed default holdings if table is empty
+  const holdingsCount = await db.holdings.count();
+  if (holdingsCount === 0) {
+    await db.holdings.bulkAdd(DEFAULT_HOLDINGS);
+  }
+
+  // Seed default schedule events for today if today has no routines
+  const today = getTodayStr();
+  const todayRoutines = await db.routines.where('date').equals(today).count();
+  if (todayRoutines === 0) {
+    for (const e of DEFAULT_SCHEDULE_EVENTS) {
+      await db.routines.add({
+        date: today,
+        title: e.title,
+        start: e.start,
+        duration: e.duration,
+        type: e.type,
+        notes: e.notes,
+        completed: false,
+      });
+    }
+  }
+};
+
+export const DEFAULT_SCHEDULE_EVENTS = [
+  { start: '08:00', duration: 15, type: 'Morning Routine', title: 'Wake Up & Hydration', notes: '• Brush teeth & wash face with gentle cleanser\n• Drink 1-2 glasses room-temperature water' },
+  { start: '08:15', duration: 25, type: 'Fitness & Spine', title: 'Targeted Back & Core Routine (25 min)', notes: '• Spine Decompression (5 min): Cat-Cow (10 reps), Cobra pose (3x20s holds)\n• Core & Glutes (10 min): Glute Bridges (3x12), Deadbugs (3x8/side)\n• Upper Body (10 min): Push-ups, seated dumbbell curls\n• AVOID: Standing overhead dumbbell presses & heavy unassisted squats' },
+  { start: '08:40', duration: 35, type: 'Hygiene', title: 'Shower & Hygiene Routine', notes: '• Bath/Shower\n• Scalp (2x/week): Ketoconazole 2% shampoo, lather, leave for full 5 mins before rinsing\n• Face: Lightweight oil-free gel moisturizer on clean skin' },
+  { start: '09:15', duration: 30, type: 'Nutrition', title: 'Gut-Friendly Breakfast', notes: '• Steamed Idlis with light Sambar OR Pesarattu with ginger chutney\n• AVOID: Oily dosas, poori, vada, deep-fried sides' },
+  { start: '09:45', duration: 15, type: 'Work Setup', title: 'Buffer & Ergonomic Desk Setup', notes: '• Fill 1L water bottle for your desk (aim 2.5-3L daily total)\n• Chair setup: Feet flat, elbows at 90 degrees, lower back supported' },
+  { start: '10:00', duration: 210, type: 'Work', title: 'Work Block 1 (Deep Work)', notes: '• Deep work on software engineering tasks\n• The 50/50 Rule: Stand up every 50 mins for 60 seconds, stretch hips, roll shoulders' },
+  { start: '13:30', duration: 45, type: 'Nutrition', title: 'Lunch Break', notes: '• 1 cup rice + Mudda Pappu / Dal + mild gourd vegetable curry\n• NON-NEGOTIABLE: 1 glass homemade churned buttermilk (majjiga) with roasted jeera & salt' },
+  { start: '14:15', duration: 15, type: 'Digestive Health', title: 'Post-Lunch Walk', notes: '• 10-15 minute casual stroll\n• Do not sit or lie down immediately after eating' },
+  { start: '14:30', duration: 150, type: 'Work', title: 'Work Block 2 (Tasks & Calls)', notes: '• Afternoon meetings, PR reviews, and coding\n• Steady water intake' },
+  { start: '17:00', duration: 20, type: 'Nutrition', title: 'Evening Snack Break', notes: '• Tender coconut water, boiled chana sundal, or roasted makhana\n• AVOID: Packaged chips, biscuits, tea-stall bajjis/samosas' },
+  { start: '17:20', duration: 100, type: 'Work', title: 'Final Work Block', notes: '• Wrap up daily sprint tickets, send EOD status updates\n• Close work laptop by 07:00 PM' },
+  { start: '19:00', duration: 45, type: 'Personal', title: 'Open Slot (Free / Transition)', notes: '• Kept open for side-hustle research, family, or communication prep' },
+  { start: '19:45', duration: 30, type: 'Nutrition', title: 'Early Dinner (Gut Repair)', notes: '• 2 Phulkas + light curry OR Pepper-cumin Rasam (charu) with small rice + 1/2 tsp ghee\n• Hard rule: Must finish before 08:30 PM to avoid overnight gut fermentation' },
+  { start: '20:15', duration: 150, type: 'Personal', title: 'Evening Wind Down / Side Projects', notes: '• Relax, read, or work on side-hustle research\n• Light 10-minute walk around 09:00 PM' },
+  { start: '22:45', duration: 15, type: 'Night Routine', title: 'Skin Care & Sleep Prep', notes: '• Wash face with gentle cleanser\n• Face Care: Apply Chemist at Play 2% Salicylic Acid only 3 nights/week\n• Sleep Posture: Pillow between knees (if on side) OR under knees (if on back)\n• Sleep by 11:00 PM' },
+];
+
+export const DEFAULT_HOLDINGS = [
+  { group: 'Liquid Funds', type: 'Cash in Hand', platform: 'In Hand', amount: 1500, date: '2026-09-01', expiry: '' },
+  { group: 'Liquid Funds', type: 'Savings Account', platform: 'HDFC Bank', amount: 62485, date: '2026-09-01', expiry: '' },
+  { group: 'Liquid Funds', type: 'Savings Account', platform: 'SBI Bank', amount: 39500, date: '2026-09-01', expiry: '' },
+  { group: 'Investments', type: 'Fixed Deposit (FD)', platform: 'SBI Bank', amount: 411011, date: '2026-09-01', expiry: '' },
+  { group: 'Investments', type: 'Mutual Funds', platform: 'Zerodha Coin', amount: 578141, date: '2026-09-01', expiry: '' },
+  { group: 'Investments', type: 'Direct Equity / Stocks', platform: 'Zerodha Kite & Smallcase', amount: 36717, date: '2026-09-01', expiry: '' },
+  { group: 'Investments', type: 'Recurring Deposit (RD)', platform: 'HDFC Bank', amount: 320000, date: '2026-09-01', expiry: '' },
+  { group: 'Outside Money', type: 'Lent Fund (Receivable)', platform: 'M Naveen', amount: 9400, date: '2025-12-01', expiry: '2025-12-01' },
+  { group: 'Outside Money', type: 'Lent Fund (Receivable)', platform: 'Hemanth', amount: 1000, date: '2026-09-01', expiry: '2026-09-01' },
+  { group: 'Physical Assets', type: 'Gold Asset', platform: 'Physical / Sovereign Gold', amount: 240000, date: '2026-09-01', expiry: '' },
+  { group: 'Perks & Rewards', type: 'Credit Card Reward Points', platform: 'Rewards Program', amount: 3000, date: '2026-09-01', expiry: '2026-10-15' },
+  { group: 'Perks & Rewards', type: 'Corporate Voucher', platform: 'Employer', amount: 3500, date: '2026-09-01', expiry: '2026-09-30' },
+  { group: 'Perks & Rewards', type: 'Digital Wallet Cash', platform: 'Amazon Pay', amount: 1299, date: '2026-09-01', expiry: '2027-03-31' },
+];
+
+export const computePortfolioNetWorth = async () => {
+  const holdings = await db.holdings.toArray();
+  let liquid = 0, invested = 0, outside = 0, gold = 0, perks = 0;
+
+  holdings.forEach(h => {
+    const amt = Number(h.amount) || 0;
+    if (h.group === 'Liquid Funds') liquid += amt;
+    else if (h.group === 'Investments') invested += amt;
+    else if (h.group === 'Outside Money') outside += amt;
+    else if (h.group === 'Physical Assets') gold += amt;
+    else if (h.group === 'Perks & Rewards') perks += amt;
+  });
+
+  const financialNetWorth = liquid + invested + outside;
+  const combinedNetWorth = financialNetWorth + gold;
+
+  return { liquid, invested, outside, gold, perks, financialNetWorth, combinedNetWorth, holdings };
+};
+
+export const getExpiringPerks = async (daysThreshold = 30) => {
+  const holdings = await db.holdings.where('group').equals('Perks & Rewards').toArray();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const expiring = [];
+  holdings.forEach(h => {
+    if (!h.expiry) return;
+    const expDate = new Date(h.expiry);
+    expDate.setHours(0, 0, 0, 0);
+    const diffDays = Math.ceil((expDate - today) / (1000 * 60 * 60 * 24));
+    if (diffDays >= 0 && diffDays <= daysThreshold) {
+      expiring.push({ ...h, diffDays });
+    }
+  });
+
+  return expiring;
 };
 
 // ─── Gamification Helpers ────────────────────────────────────────────────────

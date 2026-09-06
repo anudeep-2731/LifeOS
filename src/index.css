@@ -24,6 +24,7 @@
 }
 
 @layer components {
+
   /* No-Line Rule: We use shadows and background shifts instead of borders */
   .card-floating {
     @apply bg-surface-container-lowest rounded-2xl shadow-glass;
@@ -32,7 +33,7 @@
   .card-embedded {
     @apply bg-surface-container-high rounded-2xl;
   }
-  
+
   .glass-panel {
     @apply bg-surface/80 backdrop-blur-[20px];
   }
@@ -52,7 +53,7 @@
   .joy-tracker-bg {
     @apply bg-surface-container-highest rounded-full overflow-hidden;
   }
-  
+
   .joy-tracker-fill {
     @apply bg-gradient-to-r from-secondary to-secondary-container h-full rounded-full transition-all duration-500;
   }
@@ -63,6 +64,11 @@
 }
 
 @keyframes slideUp {
-  from { transform: translateY(100%); }
-  to   { transform: translateY(0); }
+  from {
+    transform: translateY(100%);
+  }
+
+  to {
+    transform: translateY(0);
+  }
 }

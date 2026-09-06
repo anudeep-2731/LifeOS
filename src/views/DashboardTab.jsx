@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
-import { db, getTodayStr, seedTodayData, computeStreak, getVictory, saveVictory } from '../db/database';
+import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak, getExpiringPerks, computePortfolioNetWorth } from '../db/database';
 import { askGemini } from '../lib/ai';
 import { cn } from '../lib/utils';
 
@@ -13,254 +13,239 @@ const getGreeting = () => {
   return 'Good night';
 };
 
-const MEAL_ORDER = { Breakfast: 0, Lunch: 1, Dinner: 2, Snack: 3 };
-
-const getPhase = () => {
-  const h = new Date().getHours();
-  if (h >= 5 && h < 10) return 'ZEN';
-  if (h >= 10 && h < 18) return 'HUSTLE';
-  return 'REFLECT';
-};
+const formatINR = (val) => '₹' + Number(val || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
 export default function DashboardTab() {
-  const [stats, setStats] = useState({ routines: 0, routinesDone: 0, tasks: 0, tasksDone: 0, spent: 0, fuelAdherence: 0 });
-  const [focusTask, setFocusTask] = useState(null);
-  const [streak, setStreak] = useState(null);
-  const [nextMeal, setNextMeal] = useState(null);
+  const [monthSpent, setMonthSpent] = useState(0);
+  const [todaySpent, setTodaySpent] = useState(0);
+  const [pendingItems, setPendingItems] = useState([]);
+  const [expiringPerks, setExpiringPerks] = useState([]);
   const [aiInsight, setAiInsight] = useState(null);
-  const [phase, setPhase] = useState(getPhase());
-  const [victory, setVictory] = useState('');
-  const [savedVictory, setSavedVictory] = useState(null);
+  const [streak, setStreak] = useState(null);
+  const [netWorth, setNetWorth] = useState(0);
+  const [loading, setLoading] = useState(true);
+
   const navigate = useNavigate();
   const today = getTodayStr();
+  const currentMonth = getMonthStr();
   const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  useEffect(() => {
-    seedTodayData().then(async () => {
-      const [routines, tasks, expenses, meals, streakVal] = await Promise.all([
-        db.routines.where('date').equals(today).toArray(),
-        db.tasks.where('date').equals(today).toArray(),
-        db.expenses.where('date').equals(today).toArray(),
-        db.meals.where('date').equals(today).toArray(),
-        computeStreak(),
-      ]);
+  const loadHomeData = async () => {
+    setLoading(true);
+    await seedTodayData();
 
-      const routinesDone  = routines.filter(r => r.completed).length;
-      const tasksDone     = tasks.filter(t => t.completed).length;
-      const spent         = expenses.reduce((s, e) => s + e.amount, 0);
-      const mealsDone     = meals.filter(m => m.completed).length;
-      const fuelAdherence = meals.length ? Math.round((mealsDone / meals.length) * 100) : 0;
+    // 1. Fetch Month Expenses & Today Expenses
+    const monthExpenses = await db.expenses.filter(e => e.date.startsWith(currentMonth)).toArray();
+    const mSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
+    const tSpent = monthExpenses.filter(e => e.date === today).reduce((s, e) => s + e.amount, 0);
+    setMonthSpent(mSpent);
+    setTodaySpent(tSpent);
 
-      setStats({ routines: routines.length, routinesDone, tasks: tasks.length, tasksDone, spent, fuelAdherence });
+    // 2. Fetch Today's Uncompleted Tasks & Routines
+    const [routines, tasks, streakVal, perks, nwData] = await Promise.all([
+      db.routines.where('date').equals(today).toArray(),
+      db.tasks.where('date').equals(today).toArray(),
+      computeStreak(),
+      getExpiringPerks(30),
+      computePortfolioNetWorth(),
+    ]);
 
-      const incomplete = tasks.filter(t => !t.completed);
-      incomplete.sort((a, b) => (a.scheduledTime || '').localeCompare(b.scheduledTime || ''));
-      setFocusTask(incomplete[0] || null);
-      setStreak(streakVal);
+    const uncompletedRoutines = routines
+      .filter(r => !r.completed)
+      .map(r => ({ id: r.id, itemType: 'routine', title: r.title, time: r.start || '08:00', tag: 'Habit Routine', color: 'text-emerald-400 bg-emerald-500/10' }));
 
-      const incompleteMeals = meals.filter(m => !m.completed);
-      incompleteMeals.sort((a, b) => (MEAL_ORDER[a.mealType] ?? 4) - (MEAL_ORDER[b.mealType] ?? 4));
-      setNextMeal(incompleteMeals[0] || null);
+    const uncompletedTasks = tasks
+      .filter(t => !t.completed)
+      .map(t => ({ id: t.id, itemType: 'task', title: t.title, time: t.scheduledTime || '10:00', tag: `${t.priority || 'Medium'} Priority`, color: 'text-primary bg-primary/10' }));
 
-      // Daily AI insight — cached per day
-      const vict = await getVictory(today);
-      setSavedVictory(vict);
+    const mergedPending = [...uncompletedRoutines, ...uncompletedTasks];
+    mergedPending.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
 
-      // Daily AI insight — phase aware
-      const insightKey = `aiInsight_${today}_${phase}`;
-      const cached = await db.settings.get(insightKey);
-      if (cached) {
-        setAiInsight(cached.value);
-      } else {
-        const prompts = {
-          ZEN: `Concise morning coach. Specific actionable tip for routine/intention. Context: ${routinesDone}/${routines.length} routines done. Max 18 words.`,
-          HUSTLE: `Concise focus coach. Actionable tip for task momentum & energy. Context: ${tasksDone}/${tasks.length} tasks done. Max 18 words.`,
-          REFLECT: `Concise evening coach. Tip for reflection or financial boundary. Context: ₹${spent} spent, ${mealsDone} meals logged. Max 18 words.`
-        };
-        const tip = await askGemini(prompts[phase] || prompts.HUSTLE);
-        if (tip) {
-          const clean = tip.trim().replace(/^["']|["']$/g, '');
-          await db.settings.put({ key: insightKey, value: clean });
-          setAiInsight(clean);
-        }
+    setPendingItems(mergedPending);
+    setStreak(streakVal);
+    setExpiringPerks(perks);
+    setNetWorth(nwData.combinedNetWorth);
+
+    // 3. AI Insight
+    const insightKey = `aiInsight_${today}`;
+    const cached = await db.settings.get(insightKey);
+    if (cached) {
+      setAiInsight(cached.value);
+    } else {
+      const tip = await askGemini(`Concise daily coach for productivity & money. Context: ₹${mSpent} spent this month, ${mergedPending.length} pending tasks today. Max 18 words.`);
+      if (tip) {
+        const clean = tip.trim().replace(/^["']|["']$/g, '');
+        await db.settings.put({ key: insightKey, value: clean });
+        setAiInsight(clean);
       }
-    });
+    }
 
-    const interval = setInterval(() => setPhase(getPhase()), 60000);
-    return () => clearInterval(interval);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
-
-  const handleSaveVictory = async () => {
-    if (!victory.trim()) return;
-    await saveVictory(victory.trim());
-    setSavedVictory(victory.trim());
-    setVictory('');
+    setLoading(false);
   };
 
-  const taskPct = stats.tasks ? Math.round((stats.tasksDone / stats.tasks) * 100) : 0;
+  useEffect(() => {
+    loadHomeData();
+  }, []);
+
+  const handleToggleItem = async (item) => {
+    if (item.itemType === 'routine') {
+      await db.routines.update(item.id, { completed: true });
+    } else {
+      await db.tasks.update(item.id, { completed: true });
+    }
+    loadHomeData();
+  };
 
   return (
-    <div className={cn("min-h-screen flex flex-col pb-20 transition-colors duration-1000", 
-      phase === 'ZEN' ? 'bg-orange-50/30' : phase === 'HUSTLE' ? 'bg-blue-50/30' : 'bg-purple-50/30'
-    )}>
-      <div className="px-4 pt-4 space-y-6">
-        {/* Header Section */}
-        <div className="px-2 flex justify-between items-end">
+    <div className="min-h-screen flex flex-col pb-28">
+      <div className="px-4 sm:px-6 pt-5 space-y-6">
+
+        {/* Greeting Header */}
+        <div className="flex justify-between items-end">
           <div>
-            <h1 className="text-2xl font-headline font-bold text-on-surface">
+            <h1 className="text-2xl font-headline font-extrabold text-on-surface">
               {getGreeting()}, Anudeep
             </h1>
-            <p className="text-sm text-outline mt-1">{dateStr}</p>
+            <p className="text-xs text-outline mt-0.5">{dateStr}</p>
           </div>
-          <span className={cn("text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest",
-             phase === 'ZEN' ? 'bg-orange-100 text-orange-700' : phase === 'HUSTLE' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
-          )}>
-            {phase} Phase
-          </span>
-        </div>
-
-        {/* Dynamic Hero Card */}
-        {phase === 'ZEN' && (
-           <div className="bg-gradient-to-br from-orange-400 to-amber-500 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
-              <Icon name="wb_sunny" size={48} className="text-white/20 absolute -bottom-4 -right-4 rotate-12" />
-              <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">Morning Routine</p>
-              <h2 className="text-3xl font-headline font-black mb-1">{stats.routinesDone}/{stats.routines} done</h2>
-              <p className="text-sm text-white/80 mb-6">You're buildling a powerful momentum today.</p>
-              <button onClick={() => navigate('/morning')} className="bg-white text-orange-600 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg active:scale-95 transition-all">
-                 Finish Routine
-              </button>
-           </div>
-        )}
-
-        {phase === 'HUSTLE' && (
-           <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
-              <Icon name="bolt" size={48} className="text-white/20 absolute -bottom-4 -right-4" />
-              <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">Next Mission</p>
-              <h2 className="text-3xl font-headline font-black mb-1 truncate">
-                 {focusTask ? focusTask.title : "Queue Empty"}
-              </h2>
-              <p className="text-sm text-white/80 mb-6">
-                 {focusTask ? `${focusTask.duration} mins • ${focusTask.priority} priority` : "Time to plan your next win."}
-              </p>
-              <button onClick={() => navigate('/tasks')} className="bg-white text-blue-700 px-6 py-2.5 rounded-full text-sm font-bold shadow-lg active:scale-95 transition-all">
-                 {focusTask ? "Start Task" : "Add Task"}
-              </button>
-           </div>
-        )}
-
-        {phase === 'REFLECT' && (
-           <div className="bg-gradient-to-br from-purple-600 to-indigo-800 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-16 translate-x-16" />
-              <Icon name="history_edu" size={48} className="text-white/20 absolute -bottom-4 -right-4" />
-              <p className="text-xs font-bold uppercase tracking-widest text-white/70 mb-2">Daily Review</p>
-              
-              {savedVictory ? (
-                 <div className="mb-4">
-                    <p className="text-[10px] uppercase font-bold text-white/50 mb-1">Today's Victory</p>
-                    <p className="text-lg font-headline font-bold italic">"{savedVictory}"</p>
-                 </div>
-              ) : (
-                <div className="mb-4">
-                   <p className="text-sm text-white/80 mb-2">What's one thing that went well today?</p>
-                   <div className="flex gap-2">
-                      <input 
-                        type="text" 
-                        value={victory} 
-                        onChange={e => setVictory(e.target.value)}
-                        placeholder="e.g. Finished that report..."
-                        className="bg-white/20 border border-white/30 rounded-full px-4 py-2 text-sm placeholder:text-white/40 focus:outline-none flex-1"
-                      />
-                      <button onClick={handleSaveVictory} className="bg-white text-purple-700 p-2 rounded-full active:scale-95 transition-all">
-                         <Icon name="check" size={20} />
-                      </button>
-                   </div>
-                </div>
-              )}
-              
-              <div className="flex gap-4 mt-2">
-                 <div>
-                    <p className="text-[10px] font-bold text-white/50">SPENT</p>
-                    <p className="text-lg font-bold">₹{stats.spent.toLocaleString()}</p>
-                 </div>
-                 <div className="w-px h-8 bg-white/20" />
-                 <div>
-                    <p className="text-[10px] font-bold text-white/50">FUEL</p>
-                    <p className="text-lg font-bold">{stats.fuelAdherence}%</p>
-                 </div>
-              </div>
-           </div>
-        )}
-
-        {/* Bento Stats */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="card-floating p-5 flex flex-col gap-2 relative overflow-hidden">
-            <div className="flex items-center gap-2 relative z-10">
-              <span className="w-8 h-8 rounded-xl bg-tertiary-fixed/60 flex items-center justify-center">
-                <Icon name="local_fire_department" size={18} className="text-tertiary" />
-              </span>
-              <span className="text-xs font-semibold text-outline">Streak</span>
-            </div>
-            <span className="text-3xl font-headline font-black text-on-surface relative z-10">
-              {streak === null ? '—' : streak}
-            </span>
-          </div>
-
-          <div className="card-floating p-5 flex flex-col gap-2 relative overflow-hidden">
-            <div className="flex items-center gap-2 relative z-10">
-              <span className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
-                <Icon name="check_circle" size={18} className="text-primary" />
-              </span>
-              <span className="text-xs font-semibold text-outline">Today</span>
-            </div>
-            <span className="text-3xl font-headline font-black text-on-surface relative z-10">
-              {stats.tasksDone}/{stats.tasks}
-            </span>
-            <div className="w-full h-1.5 bg-outline-variant/30 rounded-full overflow-hidden relative z-10">
-              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${taskPct}%` }} />
-            </div>
+          <div className="flex items-center gap-1 bg-surface-container-high px-3 py-1.5 rounded-full text-xs font-bold text-primary">
+            <Icon name="local_fire_department" size={16} className="text-amber-500" />
+            <span>{streak || 0} Day Streak</span>
           </div>
         </div>
 
-        {/* AI Insight */}
-        {aiInsight && (
-          <div className="card-floating p-4 bg-white/40 backdrop-blur-md border border-white/20 flex items-start gap-3 shadow-sm">
-            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-               <Icon name="auto_awesome" size={20} className="text-primary" />
-            </div>
+        {/* Card 1: Total Expense This Month */}
+        <div
+          onClick={() => navigate('/expenses')}
+          className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/30 shadow-card hover:border-primary/40 cursor-pointer transition-all relative overflow-hidden group"
+        >
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-16 translate-x-16 group-hover:scale-110 transition-transform" />
+          <div className="flex justify-between items-start mb-2 relative z-10">
             <div>
-              <p className="text-[10px] font-black text-primary uppercase tracking-widest mb-1">Morning Insight</p>
-              <p className="text-sm text-on-surface leading-relaxed font-medium">
-                {aiInsight}
+              <p className="text-xs text-outline uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
+                <Icon name="receipt_long" size={16} className="text-primary" /> Total Expense This Month
               </p>
+              <h2 className="text-4xl font-headline font-black text-on-surface">{formatINR(monthSpent)}</h2>
+            </div>
+            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+              <Icon name="arrow_forward" size={20} />
             </div>
           </div>
-        )}
 
-        {/* Info Row */}
-        <div className="grid grid-cols-2 gap-3 pb-8">
-          <button onClick={() => navigate('/nutrition')} className="card-floating p-4 text-left hover:bg-surface-container transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon name="restaurant" size={16} className="text-tertiary" />
-              <span className="text-xs font-bold text-outline uppercase tracking-wider">Fuel</span>
+          <div className="flex items-center gap-4 pt-3 border-t border-outline-variant/15 text-xs relative z-10">
+            <div>
+              <span className="text-outline">Spent Today: </span>
+              <span className="font-bold text-on-surface">{formatINR(todaySpent)}</span>
             </div>
-            {nextMeal ? (
-              <p className="text-sm font-bold text-on-surface truncate">{nextMeal.title}</p>
-            ) : (
-              <p className="text-sm text-outline">All clear</p>
-            )}
-          </button>
-
-          <button onClick={() => navigate('/money')} className="card-floating p-4 text-left hover:bg-surface-container transition-all">
-            <div className="flex items-center gap-2 mb-2">
-              <Icon name="payments" size={16} className="text-primary" />
-              <span className="text-xs font-bold text-outline uppercase tracking-wider">Money</span>
+            <div className="w-px h-3 bg-outline-variant/30" />
+            <div>
+              <span className="text-outline">Combined Net Worth: </span>
+              <span className="font-bold text-emerald-400">{formatINR(netWorth)}</span>
             </div>
-            <p className="text-sm font-bold text-on-surface">₹{stats.spent.toLocaleString()}</p>
-          </button>
+          </div>
         </div>
+
+        {/* Card 2: Today's Pending Tasks & Events */}
+        <div className="bg-surface-container-lowest rounded-3xl p-5 border border-outline-variant/30 shadow-card space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <Icon name="checklist" size={18} />
+              </div>
+              <div>
+                <h3 className="font-headline font-bold text-sm text-on-surface">Today's Pending Tasks</h3>
+                <p className="text-[11px] text-outline">{pendingItems.length} items remaining for today</p>
+              </div>
+            </div>
+
+            <button
+              onClick={() => navigate('/schedule')}
+              className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
+            >
+              Full Schedule <Icon name="chevron_right" size={16} />
+            </button>
+          </div>
+
+          <div className="space-y-2.5">
+            {loading ? (
+              <p className="text-xs text-outline text-center py-6 animate-pulse">Loading today's agenda...</p>
+            ) : pendingItems.length === 0 ? (
+              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center text-emerald-400 space-y-1">
+                <Icon name="task_alt" size={28} className="mx-auto" />
+                <p className="font-bold text-sm">All Clear for Today!</p>
+                <p className="text-xs text-emerald-400/80">Every routine and task for today is completed.</p>
+              </div>
+            ) : (
+              pendingItems.slice(0, 5).map((item) => (
+                <div
+                  key={`${item.itemType}-${item.id}`}
+                  className="bg-surface-container/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 border border-outline-variant/20 hover:bg-surface-container/80 transition-all"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <button
+                      onClick={() => handleToggleItem(item)}
+                      className="w-5 h-5 rounded-full border-2 border-outline hover:border-primary flex items-center justify-center transition-all flex-shrink-0"
+                    >
+                      <Icon name="check" size={12} className="opacity-0 hover:opacity-100 text-primary" />
+                    </button>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-xs text-on-surface truncate">{item.title}</p>
+                      <p className="text-[10px] text-outline mt-0.5 flex items-center gap-1">
+                        <Icon name="schedule" size={10} /> {item.time}
+                      </p>
+                    </div>
+                  </div>
+
+                  <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0', item.color)}>
+                    {item.tag}
+                  </span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* Card 3: Notifications & AI Coach Insights */}
+        <div className="space-y-3">
+          <h3 className="text-xs font-headline font-bold uppercase tracking-wider text-outline px-1">
+            Notifications & Daily Insights
+          </h3>
+
+          {/* Perk Expiry Notification Banner */}
+          {expiringPerks && expiringPerks.length > 0 && (
+            <div
+              onClick={() => navigate('/portfolio')}
+              className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/15 transition-all shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0 animate-pulse">
+                  <Icon name="warning" size={18} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-xs text-amber-400">Expiring Reward Perks</h4>
+                  <p className="text-[11px] text-outline mt-0.5">
+                    {expiringPerks.map(p => `${p.type} (${p.platform}) in ${p.diffDays}d`).join(' • ')}
+                  </p>
+                </div>
+              </div>
+              <Icon name="chevron_right" size={18} className="text-amber-400" />
+            </div>
+          )}
+
+          {/* AI Daily Coach Insight */}
+          {aiInsight && (
+            <div className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/30 shadow-card flex items-start gap-3">
+              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                <Icon name="auto_awesome" size={18} />
+              </div>
+              <div>
+                <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest mb-0.5">Daily Coach Insight</p>
+                <p className="text-xs text-on-surface leading-relaxed font-medium">"{aiInsight}"</p>
+              </div>
+            </div>
+          )}
+        </div>
+
       </div>
     </div>
   );
