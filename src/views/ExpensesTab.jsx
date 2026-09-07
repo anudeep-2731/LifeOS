@@ -9,7 +9,8 @@ import {
   addCloudExpense, 
   updateCloudExpense, 
   deleteCloudExpense, 
-  adjustCloudHoldingBalance 
+  adjustCloudHoldingBalance,
+  fetchCloudSetting
 } from '../lib/supabase';
 import { DEFAULT_CATEGORY, EMPTY_FORM } from '../lib/constants';
 import { downloadCSV } from '../lib/ExportUtils';
@@ -200,12 +201,12 @@ export default function ExpensesTab() {
     await rolloverFinancials(selectedMonth);
 
     const [b, ec] = await Promise.all([
-      db.settings.get('monthlyBudget'),
-      db.settings.get('expenseCategories'),
+      fetchCloudSetting('monthlyBudget', 30000),
+      fetchCloudSetting('expenseCategories', []),
     ]);
 
-    if (b) setBudget(b.value);
-    if (ec) setCategories(ec.value);
+    if (b !== undefined && b !== null) setBudget(b);
+    if (ec) setCategories(ec);
 
     const monthExpenses = await fetchCloudExpenses(selectedMonth);
     setExpenses(monthExpenses);
@@ -315,11 +316,8 @@ export default function ExpensesTab() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowSettings(true)} className="p-2 rounded-full bg-surface-container text-outline hover:text-on-surface">
+            <button onClick={() => setShowSettings(true)} className="p-2 rounded-full bg-surface-container text-outline hover:text-on-surface" title="Finance Settings">
               <Icon name="tune" size={16} />
-            </button>
-            <button onClick={() => setShowImport(true)} className="flex items-center gap-1 bg-primary-fixed text-on-primary-fixed-variant text-xs font-bold rounded-full px-3 py-1.5">
-              <Icon name="auto_awesome" size={14} /> Import
             </button>
           </div>
         </div>

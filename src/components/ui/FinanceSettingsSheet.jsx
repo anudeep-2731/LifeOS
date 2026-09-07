@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import BottomSheet from './BottomSheet';
 import Icon from './Icon';
 import { db } from '../../db/database';
+import { fetchCloudSetting, saveCloudSetting } from '../../lib/supabase';
 import { CATEGORY_CONFIG } from '../../lib/constants';
 
 export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
@@ -26,36 +27,36 @@ export default function FinanceSettingsSheet({ isOpen, onClose, onSave }) {
 
   const loadSettings = async () => {
     const [b, ec, ic, inc, em, cb, br, gsheet] = await Promise.all([
-      db.settings.get('monthlyBudget'),
-      db.settings.get('expenseCategories'),
-      db.settings.get('investmentCategories'),
-      db.settings.get('incomeCategories'),
-      db.settings.get('emiCategories'),
-      db.settings.get('categoryBudgets'),
-      db.settings.get('budgetRules'),
-      db.settings.get('google_sheet_url'),
+      fetchCloudSetting('monthlyBudget', 30000),
+      fetchCloudSetting('expenseCategories', []),
+      fetchCloudSetting('investmentCategories', []),
+      fetchCloudSetting('incomeCategories', []),
+      fetchCloudSetting('emiCategories', []),
+      fetchCloudSetting('categoryBudgets', {}),
+      fetchCloudSetting('budgetRules', { needs: 50, wants: 30, savings: 20 }),
+      fetchCloudSetting('google_sheet_url', ''),
     ]);
 
-    if (b) setBudget(b.value);
-    if (ec) setExpenseCategories(ec.value || []);
-    if (ic) setInvestCategories(ic.value || []);
-    if (inc) setIncomeCategories(inc.value || []);
-    if (em) setEmiCategories(em.value || []);
-    if (cb) setCategoryBudgets(cb.value || {});
-    if (br) setBudgetRules(br.value || { needs: 50, wants: 30, savings: 20 });
-    if (gsheet) setGSheetUrl(gsheet.value || '');
+    if (b !== undefined && b !== null) setBudget(b);
+    if (ec) setExpenseCategories(ec);
+    if (ic) setInvestCategories(ic);
+    if (inc) setIncomeCategories(inc);
+    if (em) setEmiCategories(em);
+    if (cb) setCategoryBudgets(cb);
+    if (br) setBudgetRules(br);
+    if (gsheet) setGSheetUrl(gsheet);
   };
 
   const handleSave = async () => {
     await Promise.all([
-      db.settings.put({ key: 'monthlyBudget', value: Number(budget) }),
-      db.settings.put({ key: 'expenseCategories', value: expenseCategories }),
-      db.settings.put({ key: 'investmentCategories', value: investCategories }),
-      db.settings.put({ key: 'incomeCategories', value: incomeCategories }),
-      db.settings.put({ key: 'emiCategories', value: emiCategories }),
-      db.settings.put({ key: 'categoryBudgets', value: categoryBudgets }),
-      db.settings.put({ key: 'budgetRules', value: budgetRules }),
-      db.settings.put({ key: 'google_sheet_url', value: gSheetUrl.trim() }),
+      saveCloudSetting('monthlyBudget', Number(budget)),
+      saveCloudSetting('expenseCategories', expenseCategories),
+      saveCloudSetting('investmentCategories', investCategories),
+      saveCloudSetting('incomeCategories', incomeCategories),
+      saveCloudSetting('emiCategories', emiCategories),
+      saveCloudSetting('categoryBudgets', categoryBudgets),
+      saveCloudSetting('budgetRules', budgetRules),
+      saveCloudSetting('google_sheet_url', gSheetUrl.trim()),
     ]);
     window.dispatchEvent(new CustomEvent('life-os:settings-saved'));
     onSave();

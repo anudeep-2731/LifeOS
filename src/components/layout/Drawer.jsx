@@ -43,8 +43,14 @@ export default function Drawer({ isOpen, onClose }) {
     if (client) {
       await client.auth.signOut();
     }
-    await db.settings.delete('user_full_name');
-    await db.settings.delete('user_email');
+    await Promise.all([
+      db.tasks.clear(),
+      db.routines.clear(),
+      db.expenses.clear(),
+      db.holdings.clear(),
+      db.settings.clear(),
+      db.userStats.clear(),
+    ]);
     setUser(null);
     setUserName('');
     setUserEmail('');

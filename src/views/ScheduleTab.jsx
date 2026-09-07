@@ -3,6 +3,7 @@ import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import DatePickerModal from '../components/ui/DatePickerModal';
 import MasterRoutineModal from '../components/ui/MasterRoutineModal';
+import TaskShareModal from '../components/circles/TaskShareModal';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, getWeekDates, seedTodayData } from '../db/database';
 import { 
@@ -10,7 +11,8 @@ import {
   addCloudScheduleItem, 
   updateCloudScheduleItem, 
   deleteCloudScheduleItem,
-  autoPopulateDailyRoutines
+  autoPopulateDailyRoutines,
+  publishDailySnapshot
 } from '../lib/supabase';
 
 export default function ScheduleTab() {
@@ -56,19 +58,32 @@ export default function ScheduleTab() {
     loadSchedule();
   }, [selectedDate]);
 
+  // Task Share Modal State
+  const [completedTaskForShare, setCompletedTaskForShare] = useState(null);
+
   const toggleRoutine = async (id, currentCompleted) => {
     const target = routines.find(r => r.id === id);
     if (target) {
-      await updateCloudScheduleItem(id, { ...target, completed: !currentCompleted });
+      const willBeCompleted = !currentCompleted;
+      await updateCloudScheduleItem(id, { ...target, completed: willBeCompleted });
       await loadSchedule();
+      publishDailySnapshot(selectedDate).catch(console.error);
+      if (willBeCompleted) {
+        setCompletedTaskForShare(target.title);
+      }
     }
   };
 
   const toggleTask = async (id, currentCompleted) => {
     const target = tasks.find(t => t.id === id);
     if (target) {
-      await updateCloudScheduleItem(id, { ...target, completed: !currentCompleted });
+      const willBeCompleted = !currentCompleted;
+      await updateCloudScheduleItem(id, { ...target, completed: willBeCompleted });
       await loadSchedule();
+      publishDailySnapshot(selectedDate).catch(console.error);
+      if (willBeCompleted) {
+        setCompletedTaskForShare(target.title);
+      }
     }
   };
 
@@ -613,6 +628,12 @@ export default function ScheduleTab() {
         isOpen={showMasterModal}
         onClose={() => setShowMasterModal(false)}
         onRoutinesSaved={() => loadSchedule()}
+      />
+
+      <TaskShareModal
+        isOpen={!!completedTaskForShare}
+        onClose={() => setCompletedTaskForShare(null)}
+        taskTitle={completedTaskForShare}
       />
     </div>
   );

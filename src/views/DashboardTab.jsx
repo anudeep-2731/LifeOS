@@ -3,13 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import QuickLoggerBar from '../components/ui/QuickLoggerBar';
 import LifeHealthDiagnosticCard from '../components/dashboard/LifeHealthDiagnosticCard';
+import DailyFocusBriefingModal from '../components/dashboard/DailyFocusBriefingModal';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
 import { 
   fetchCloudExpenses, 
   fetchCloudSchedule, 
   computeCloudPortfolioNetWorth, 
   getCloudExpiringPerks, 
-  updateCloudScheduleItem 
+  updateCloudScheduleItem,
+  fetchCloudSetting,
+  fetchUserProfileName,
+  publishDailySnapshot
 } from '../lib/supabase';
 import { askGemini } from '../lib/ai';
 import { cn } from '../lib/utils';
@@ -35,6 +39,9 @@ export default function DashboardTab() {
   const [streak, setStreak] = useState(null);
   const [netWorth, setNetWorth] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showBriefingModal, setShowBriefingModal] = useState(false);
+  const [monthlyBudget, setMonthlyBudget] = useState(30000);
+  const [userName, setUserName] = useState('');
 
   const navigate = useNavigate();
   const today = getTodayStr();
@@ -44,6 +51,16 @@ export default function DashboardTab() {
   const loadHomeData = async () => {
     setLoading(true);
     await seedTodayData();
+
+    const profileName = await fetchUserProfileName();
+    setUserName(profileName);
+
+    // Auto-publish circle daily snapshot
+    publishDailySnapshot(today).catch(console.error);
+
+    // Fetch cloud-synced monthly budget
+    const b = await fetchCloudSetting('monthlyBudget', 30000);
+    if (b !== undefined && b !== null) setMonthlyBudget(b);
 
     // 1. Fetch Month Expenses & Today Expenses
     const monthExpenses = await fetchCloudExpenses(currentMonth);
@@ -66,11 +83,29 @@ export default function DashboardTab() {
 
     const uncompletedRoutines = routines
       .filter(r => !r.completed)
-      .map(r => ({ ...r, id: r.id, itemType: 'routine', title: r.title, time: r.start || '08:00', tag: 'Habit Routine', color: 'text-emerald-400 bg-emerald-500/10' }));
+      .map(r => ({ 
+        ...r, 
+        id: r.id, 
+        itemType: 'routine', 
+        title: r.title, 
+        description: r.notes || r.description || '',
+        time: r.start || '08:00', 
+        tag: 'Habit Routine', 
+        color: 'text-emerald-400 bg-emerald-500/10' 
+      }));
 
     const uncompletedTasks = (schedData.tasks || [])
       .filter(t => !t.completed)
-      .map(t => ({ ...t, id: t.id, itemType: 'task', title: t.title, time: t.scheduledTime || '10:00', tag: `${t.priority || 'Medium'} Priority`, color: 'text-primary bg-primary/10' }));
+      .map(t => ({ 
+        ...t, 
+        id: t.id, 
+        itemType: 'task', 
+        title: t.title, 
+        description: t.notes || t.description || '',
+        time: t.scheduledTime || '10:00', 
+        tag: `${t.priority || 'Medium'} Priority`, 
+        color: 'text-primary bg-primary/10' 
+      }));
 
     const mergedPending = [...uncompletedRoutines, ...uncompletedTasks];
     mergedPending.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
@@ -79,6 +114,13 @@ export default function DashboardTab() {
     setStreak(streakVal);
     setExpiringPerks(perks);
     setNetWorth(nwData.combinedNetWorth);
+
+    // Auto-popup Daily Briefing on first view of the day
+    const briefingKey = `briefing_seen_${today}`;
+    const briefingSeen = await db.settings.get(briefingKey);
+    if (!briefingSeen?.value) {
+      setShowBriefingModal(true);
+    }
 
     // 3. AI Insight
     const insightKey = `aiInsight_${today}`;
@@ -101,6 +143,11 @@ export default function DashboardTab() {
     loadHomeData();
   }, []);
 
+  const handleCloseBriefing = async () => {
+    await db.settings.put({ key: `briefing_seen_${today}`, value: true });
+    setShowBriefingModal(false);
+  };
+
   const handleToggleItem = async (item) => {
     await updateCloudScheduleItem(item.id, { ...item, completed: true });
     loadHomeData();
@@ -111,16 +158,28 @@ export default function DashboardTab() {
       <div className="px-4 sm:px-6 pt-5 space-y-6">
 
         {/* Greeting Header */}
-        <div className="flex justify-between items-end">
+        <div className="flex justify-between items-end gap-2">
           <div>
             <h1 className="text-2xl font-headline font-extrabold text-on-surface">
-              {getGreeting()}, Anudeep
+              {getGreeting()}, {userName || 'User'}
             </h1>
             <p className="text-xs text-outline mt-0.5">{dateStr}</p>
           </div>
-          <div className="flex items-center gap-1 bg-surface-container-high px-3 py-1.5 rounded-full text-xs font-bold text-primary">
-            <Icon name="local_fire_department" size={16} className="text-amber-500" />
-            <span>{streak || 0} Day Streak</span>
+          
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setShowBriefingModal(true)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/20 shadow-xs transition-all"
+              title="Today's Executive Briefing"
+            >
+              <Icon name="center_focus_strong" size={15} />
+              <span>Daily Briefing</span>
+            </button>
+
+            <div className="flex items-center gap-1 bg-surface-container-high px-3 py-1.5 rounded-full text-xs font-bold text-primary">
+              <Icon name="local_fire_department" size={16} className="text-amber-500" />
+              <span>{streak || 0} Day Streak</span>
+            </div>
           </div>
         </div>
 
@@ -271,6 +330,16 @@ export default function DashboardTab() {
         </div>
 
       </div>
+
+      {/* Daily Executive Briefing Pop-up Modal */}
+      <DailyFocusBriefingModal
+        isOpen={showBriefingModal}
+        onClose={handleCloseBriefing}
+        pendingItems={pendingItems}
+        monthSpent={monthSpent}
+        monthlyBudget={monthlyBudget}
+        streak={streak || 0}
+      />
     </div>
   );
 }

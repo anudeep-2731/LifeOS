@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react';
 import Icon from '../components/ui/Icon';
 import BottomSheet from '../components/ui/BottomSheet';
 import { cn } from '../lib/utils';
-import { db, getTodayStr, seedTodayData, rolloverRecurringTasks } from '../db/database';
+import { db, getTodayStr, seedTodayData } from '../db/database';
+import { 
+  fetchCloudSchedule, 
+  addCloudScheduleItem, 
+  updateCloudScheduleItem, 
+  deleteCloudScheduleItem,
+  autoPopulateDailyRoutines 
+} from '../lib/supabase';
 import { prioritizeTasksWithAI, simplifyTaskWithAI } from '../lib/ai';
 
 const PRIORITY_BORDER = {
@@ -123,26 +130,30 @@ function TaskForm({ onSave, onClose, initialData, editId }) {
     e.preventDefault();
     if (!form.title.trim()) return;
     const today = getTodayStr();
+
     if (editId) {
-      await db.tasks.update(editId, {
-        title: form.title.trim(),
-        duration: Number(form.duration),
-        priority: form.priority,
-        scheduledTime: form.scheduledTime,
-        recurring: form.recurring,
-        dueDate: form.dueDate,
-      });
-    } else {
-      await db.tasks.add({
-        date: today,
+      await updateCloudScheduleItem(editId, {
+        ...initialData,
+        itemType: 'task',
+        date: form.dueDate || today,
         dueDate: form.dueDate || today,
         title: form.title.trim(),
-        duration: Number(form.duration),
-        priority: form.priority,
-        scheduledTime: form.scheduledTime,
-        postponeCount: 0,
+        duration: Number(form.duration) || 15,
+        priority: form.priority || 'medium',
+        scheduledTime: form.scheduledTime || '09:00',
+        recurring: form.recurring || 'none',
+      });
+    } else {
+      await addCloudScheduleItem({
+        itemType: 'task',
+        date: form.dueDate || today,
+        dueDate: form.dueDate || today,
+        title: form.title.trim(),
+        duration: Number(form.duration) || 15,
+        priority: form.priority || 'medium',
+        scheduledTime: form.scheduledTime || '09:00',
         completed: false,
-        recurring: form.recurring,
+        recurring: form.recurring || 'none',
       });
     }
     onSave();
@@ -226,36 +237,34 @@ export default function TasksTab() {
 
   const loadTasks = async () => {
     setLoading(true);
-    const [todayTasks, cfTasks] = await Promise.all([
-      db.tasks.where('date').equals(today).toArray(),
-      db.tasks.where('completed').equals(0).and(t => t.dueDate && t.dueDate < today && t.date !== today).toArray()
-    ]);
+    await seedTodayData();
+    await autoPopulateDailyRoutines(today);
+
+    const data = await fetchCloudSchedule(today);
+    const cloudTasks = data.tasks || [];
 
     const sortFn = (a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      return (a.scheduledTime || '').localeCompare(b.scheduledTime || '');
+      return (a.time || a.scheduledTime || '').localeCompare(b.time || b.scheduledTime || '');
     };
 
-    setTasks(todayTasks.sort(sortFn));
-    setCarriedForward(cfTasks.sort(sortFn));
+    setTasks(cloudTasks.sort(sortFn));
+    setCarriedForward([]);
     setLoading(false);
   };
 
   useEffect(() => {
-    seedTodayData().then(async () => {
-      await rolloverRecurringTasks(today);
-      loadTasks();
-    });
+    loadTasks();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleToggle = async (task) => {
-    await db.tasks.update(task.id, { completed: !task.completed });
+    await updateCloudScheduleItem(task.id, { ...task, completed: !task.completed });
     loadTasks();
   };
 
   const handleDelete = async (task) => {
-    await db.tasks.delete(task.id);
+    await deleteCloudScheduleItem(task.id);
     loadTasks();
   };
 
@@ -263,7 +272,8 @@ export default function TasksTab() {
     const t = new Date();
     const tm = new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1);
     const tomorrowStr = `${tm.getFullYear()}-${String(tm.getMonth()+1).padStart(2,'0')}-${String(tm.getDate()).padStart(2,'0')}`;
-    await db.tasks.update(task.id, { 
+    await updateCloudScheduleItem(task.id, { 
+      ...task,
       date: tomorrowStr,
       dueDate: tomorrowStr,
       postponeCount: (task.postponeCount || 0) + 1 
@@ -273,16 +283,17 @@ export default function TasksTab() {
 
   const handleScheduleToRoutine = async () => {
     if (!taskToSchedule) return;
-    await db.routines.add({
+    await addCloudScheduleItem({
+      itemType: 'routine',
       date: today,
+      dueDate: today,
       title: taskToSchedule.title,
-      start: scheduleTime,
+      scheduledTime: scheduleTime,
       duration: taskToSchedule.duration,
-      type: 'morning',
+      category: 'Work',
       completed: false,
-      taskId: taskToSchedule.id,
     });
-    await db.tasks.update(taskToSchedule.id, { scheduledTime: scheduleTime });
+    await updateCloudScheduleItem(taskToSchedule.id, { ...taskToSchedule, scheduledTime: scheduleTime });
     setShowScheduleSheet(false);
     setTaskToSchedule(null);
     loadTasks();

@@ -10,6 +10,7 @@ import STIMatrixSection from '../components/finance/STIMatrixSection';
 import GoalSimulatorsSection from '../components/finance/GoalSimulatorsSection';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials, computePortfolioNetWorth, getExpiringPerks } from '../db/database';
+import { fetchCloudSetting } from '../lib/supabase';
 import { DEFAULT_CATEGORY, EMPTY_FORM } from '../lib/constants';
 import { downloadCSV } from '../lib/ExportUtils';
 
@@ -265,24 +266,24 @@ export default function MoneyTab() {
     await rolloverFinancials(selectedMonth);
 
     const [b, c, cb, ec, ic, mc, br, portData, expPerks] = await Promise.all([
-      db.settings.get('monthlyBudget'),
-      db.settings.get('investmentCategories'),
-      db.settings.get('categoryBudgets'),
-      db.settings.get('expenseCategories'),
-      db.settings.get('incomeCategories'),
-      db.settings.get('emiCategories'),
-      db.settings.get('budgetRules'),
+      fetchCloudSetting('monthlyBudget', 30000),
+      fetchCloudSetting('investmentCategories', []),
+      fetchCloudSetting('categoryBudgets', {}),
+      fetchCloudSetting('expenseCategories', []),
+      fetchCloudSetting('incomeCategories', []),
+      fetchCloudSetting('emiCategories', []),
+      fetchCloudSetting('budgetRules', { needs: 50, wants: 30, savings: 20 }),
       computePortfolioNetWorth(),
       getExpiringPerks(30),
     ]);
 
-    if (b)  setBudget(b.value);
-    if (c)  setInvestCats(c.value);
-    if (cb) setCategoryBudgets(cb.value);
-    if (ec) setCategories(ec.value);
-    if (ic) setIncomeCats(ic.value);
-    if (mc) setEmiCats(mc.value);
-    if (br) setBudgetRules(br.value);
+    if (b !== undefined && b !== null) setBudget(b);
+    if (c)  setInvestCats(c);
+    if (cb) setCategoryBudgets(cb);
+    if (ec) setCategories(ec);
+    if (ic) setIncomeCats(ic);
+    if (mc) setEmiCats(mc);
+    if (br) setBudgetRules(br);
 
     setPortfolio(portData);
     setExpiringPerks(expPerks);

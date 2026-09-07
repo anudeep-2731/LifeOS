@@ -6,6 +6,7 @@ import DashboardTab from './views/DashboardTab';
 import ScheduleTab from './views/ScheduleTab';
 import ExpensesTab from './views/ExpensesTab';
 import PortfolioTab from './views/PortfolioTab';
+import CirclesTab from './views/CirclesTab';
 import AuthView from './views/AuthView';
 import { getSupabase, migrateLocalDataToSupabase } from './lib/supabase';
 
@@ -71,6 +72,10 @@ function AppContent() {
           <Route
             path="/portfolio"
             element={session ? <PortfolioTab /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/circles"
+            element={session ? <CirclesTab /> : <Navigate to="/login" replace />}
           />
 
           {/* Legacy route redirects */}
