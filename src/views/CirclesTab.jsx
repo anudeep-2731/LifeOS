@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../components/ui/Icon';
 import CreateCircleModal from '../components/circles/CreateCircleModal';
@@ -28,7 +28,10 @@ export default function CirclesTab() {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserName, setCurrentUserName] = useState('');
 
-  // Modals & Composer state
+  // Dropdown & Modals state
+  const [showSquadDropdown, setShowSquadDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
@@ -85,8 +88,20 @@ export default function CirclesTab() {
     loadData();
   }, []);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowSquadDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   const handleSelectCircle = async (circle) => {
     setSelectedCircle(circle);
+    setShowSquadDropdown(false);
     setLoading(true);
     try {
       const [mList, snaps, pList] = await Promise.all([
@@ -120,20 +135,86 @@ export default function CirclesTab() {
 
   return (
     <div className="flex flex-col w-full px-4 pb-28 pt-2 select-none max-w-lg mx-auto gap-4">
-      {/* 1. TOP HEADER BAR */}
+      {/* 1. TOP HEADER BAR WITH SQUAD SELECTOR DROPDOWN */}
       <header className="flex items-center justify-between pt-1">
-        <div className="flex items-center gap-2">
+        <div className="relative" ref={dropdownRef}>
           <button
-            onClick={() => setShowSettingsSheet(true)}
+            onClick={() => setShowSquadDropdown(prev => !prev)}
             className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 text-on-surface font-headline text-sm font-bold tracking-tight transition-all active:scale-95 shadow-xs"
           >
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
             </span>
-            <span>{selectedCircle?.name || 'Titan Squad'}</span>
-            <Icon name="keyboard_arrow_down" size={18} className="text-on-surface-variant" />
+            <span>{selectedCircle?.name || 'Select Squad'}</span>
+            <Icon name="keyboard_arrow_down" size={18} className={`text-on-surface-variant transition-transform ${showSquadDropdown ? 'rotate-180' : ''}`} />
           </button>
+
+          {/* Squad Switcher Dropdown Menu */}
+          <AnimatePresence>
+            {showSquadDropdown && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 4 }}
+                className="absolute left-0 top-12 z-50 w-64 rounded-2xl bg-surface-container-lowest shadow-2xl border border-outline-variant/30 p-2 space-y-1"
+              >
+                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
+                  Your Squads ({circles.length})
+                </div>
+
+                <div className="max-h-48 overflow-y-auto space-y-0.5 py-1">
+                  {circles.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-on-surface-variant italic">
+                      No squads joined yet
+                    </div>
+                  ) : (
+                    circles.map((c) => {
+                      const isSelected = selectedCircle?.id === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => handleSelectCircle(c)}
+                          className={`w-full px-3 py-2.5 rounded-xl text-left font-headline text-xs font-bold flex items-center justify-between transition-colors ${
+                            isSelected
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-on-surface hover:bg-surface-container-low'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isSelected ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'
+                            }`}>
+                              {c.name?.charAt(0).toUpperCase() || 'S'}
+                            </div>
+                            <span className="truncate">{c.name}</span>
+                          </div>
+                          {isSelected && <Icon name="check" size={16} className="text-primary" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="pt-1 border-t border-outline-variant/15 grid grid-cols-2 gap-1">
+                  <button
+                    onClick={() => { setShowSquadDropdown(false); setShowCreateModal(true); }}
+                    className="w-full px-2.5 py-2 text-center text-xs font-bold text-primary hover:bg-primary/10 rounded-xl flex items-center justify-center gap-1"
+                  >
+                    <Icon name="add" size={14} />
+                    <span>Create</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowSquadDropdown(false); setShowJoinModal(true); }}
+                    className="w-full px-2.5 py-2 text-center text-xs font-bold text-secondary hover:bg-secondary/10 rounded-xl flex items-center justify-center gap-1"
+                  >
+                    <Icon name="group_add" size={14} />
+                    <span>Join</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="flex items-center gap-2">
@@ -164,7 +245,7 @@ export default function CirclesTab() {
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
               </span>
               <span className="font-headline text-xs font-bold text-on-surface">Squad Pulse</span>
-              <span className="text-[10px] font-label text-on-surface-variant">· {selectedCircle?.name || 'Titan'}</span>
+              <span className="text-[10px] font-label text-on-surface-variant">· {selectedCircle?.name || 'Squad'}</span>
             </div>
 
             <div className="flex items-center gap-1.5">
@@ -173,7 +254,7 @@ export default function CirclesTab() {
                 <span>{activeCount}/8 Active</span>
               </div>
               <button
-                onClick={() => setShowSettingsSheet(true)}
+                onClick={() => setShowSquadDropdown(prev => !prev)}
                 className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label text-[10px] font-semibold hover:bg-primary-fixed/80 transition-colors active:scale-95"
               >
                 <Icon name="swap_horiz" size={12} />
@@ -219,45 +300,40 @@ export default function CirclesTab() {
         </div>
       </div>
 
-      {/* 3. GANG STORY ROW */}
+      {/* 3. MEMBER AVATARS STORY ROW (Strictly Members Pics) */}
       <div className="w-full overflow-x-auto scrollbar-none flex items-center gap-3.5 py-1">
-        {/* Member Avatars */}
-        {members.map((mem) => {
-          const snap = snapshots[mem.user_id];
-          const isDone = (snap?.routines_completed || 0) > 0;
+        {members.length === 0 ? (
+          <div className="text-xs text-on-surface-variant italic px-1 py-2">
+            No members in this circle yet
+          </div>
+        ) : (
+          members.map((mem) => {
+            const snap = snapshots[mem.user_id];
+            const isDone = (snap?.routines_completed || 0) > 0;
+            const displayName = mem.display_name || mem.user_name || 'Member';
 
-          return (
-            <motion.button
-              whileTap={{ scale: 0.92 }}
-              key={mem.user_id}
-              onClick={() => setSelectedMember(mem)}
-              className="flex flex-col items-center gap-1.5 flex-shrink-0 group focus:outline-none"
-            >
-              <div className={`w-[60px] h-[60px] rounded-full p-[2.5px] flex items-center justify-center transition-transform active:scale-95 ${
-                isDone ? 'bg-secondary' : 'bg-primary-container'
-              }`}>
-                <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner">
-                  {mem.display_name ? mem.display_name[0].toUpperCase() : 'U'}
+            return (
+              <motion.button
+                whileTap={{ scale: 0.92 }}
+                key={mem.user_id || mem.id}
+                onClick={() => setSelectedMember(mem)}
+                className="flex flex-col items-center gap-1.5 flex-shrink-0 group focus:outline-none"
+                title={`View ${displayName}'s scorecard`}
+              >
+                <div className={`w-[60px] h-[60px] rounded-full p-[2.5px] flex items-center justify-center transition-transform active:scale-95 ${
+                  isDone ? 'bg-secondary' : 'bg-primary-container'
+                }`}>
+                  <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner">
+                    {displayName[0].toUpperCase()}
+                  </div>
                 </div>
-              </div>
-              <span className="font-label text-xs text-on-surface max-w-[68px] truncate text-center font-medium">
-                {mem.display_name || 'Member'}
-              </span>
-            </motion.button>
-          );
-        })}
-
-        {/* New Gang (+) Button */}
-        <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
-          <motion.button
-            whileTap={{ scale: 0.92 }}
-            onClick={() => setShowCreateModal(true)}
-            className="w-[60px] h-[60px] rounded-full border-2 border-dashed border-outline-variant flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary transition-colors active:scale-95"
-          >
-            <Icon name="add" size={24} />
-          </motion.button>
-          <span className="font-label text-xs text-on-surface-variant max-w-[68px] truncate text-center">New Gang</span>
-        </div>
+                <span className="font-label text-xs text-on-surface max-w-[68px] truncate text-center font-medium">
+                  {displayName}
+                </span>
+              </motion.button>
+            );
+          })
+        )}
       </div>
 
       {/* 4. ACTION BANNER: SQUAD SCORECARDS */}
@@ -269,7 +345,7 @@ export default function CirclesTab() {
         <span>🏆 Squad Scorecards · Weekly Leaderboard</span>
       </button>
 
-      {/* 5. POST COMPOSER CARD (Visible when showComposer is true or always ready) */}
+      {/* 5. POST COMPOSER CARD (Visible when showComposer is true) */}
       <AnimatePresence>
         {showComposer && selectedCircle && (
           <motion.div
@@ -341,10 +417,11 @@ export default function CirclesTab() {
         isOpen={showSettingsSheet}
         onClose={() => setShowSettingsSheet(false)}
         circle={selectedCircle}
-        circles={circles}
-        onSelectCircle={handleSelectCircle}
-        onOpenCreate={() => { setShowSettingsSheet(false); setShowCreateModal(true); }}
-        onOpenJoin={() => { setShowSettingsSheet(false); setShowJoinModal(true); }}
+        members={members}
+        currentUserId={currentUserId}
+        onCircleUpdated={() => loadData()}
+        onOpenCreate={() => setShowCreateModal(true)}
+        onOpenJoin={() => setShowJoinModal(true)}
       />
 
       {selectedMember && (

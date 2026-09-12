@@ -2,7 +2,16 @@ import React, { useState } from 'react';
 import Icon from '../ui/Icon';
 import { leaveCircle, deleteCircle } from '../../lib/supabase';
 
-export default function CircleSettingsSheet({ isOpen, onClose, circle, members = [], currentUserId, onCircleUpdated }) {
+export default function CircleSettingsSheet({
+  isOpen,
+  onClose,
+  circle,
+  members = [],
+  currentUserId,
+  onCircleUpdated,
+  onOpenCreate,
+  onOpenJoin,
+}) {
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -47,7 +56,7 @@ export default function CircleSettingsSheet({ isOpen, onClose, circle, members =
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-xl animate-in slide-in-from-bottom duration-200">
-        <div className="flex justify-between items-center mb-5">
+        <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
               <Icon name="settings" className="text-xl" />
@@ -66,7 +75,7 @@ export default function CircleSettingsSheet({ isOpen, onClose, circle, members =
         </div>
 
         {/* Invite Code Box */}
-        <div className="p-4 mb-5 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between">
+        <div className="p-4 mb-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between">
           <div>
             <span className="text-[10px] uppercase font-bold text-primary tracking-wider block mb-0.5">
               Circle Invite Code
@@ -77,43 +86,61 @@ export default function CircleSettingsSheet({ isOpen, onClose, circle, members =
           </div>
           <button
             onClick={handleCopyCode}
-            className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-semibold hover:brightness-110 transition-all flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-primary text-on-primary text-xs font-semibold hover:brightness-110 transition-all flex items-center gap-1.5 shadow-sm active:scale-95"
           >
             <Icon name={copied ? 'check' : 'content_copy'} className="text-sm" />
             <span>{copied ? 'Copied!' : 'Copy Code'}</span>
           </button>
         </div>
 
+        {/* Neat Quick Actions: Create & Join Circle */}
+        <div className="grid grid-cols-2 gap-2.5 mb-5">
+          <button
+            onClick={() => { onClose(); if (onOpenCreate) onOpenCreate(); }}
+            className="py-2.5 px-3 rounded-2xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-headline font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-xs"
+          >
+            <Icon name="add_circle" className="text-primary text-base" />
+            <span>Create Circle</span>
+          </button>
+          <button
+            onClick={() => { onClose(); if (onOpenJoin) onOpenJoin(); }}
+            className="py-2.5 px-3 rounded-2xl bg-surface-container-low hover:bg-surface-container-high border border-outline-variant/30 text-on-surface text-xs font-headline font-bold flex items-center justify-center gap-1.5 transition-all active:scale-95 shadow-xs"
+          >
+            <Icon name="group_add" className="text-secondary text-base" />
+            <span>Join Circle</span>
+          </button>
+        </div>
+
         {/* Members List */}
-        <div className="mb-6">
-          <h4 className="text-xs font-semibold text-on-surface-variant mb-2.5 flex items-center justify-between">
+        <div className="mb-5">
+          <h4 className="text-xs font-semibold text-on-surface-variant mb-2 flex items-center justify-between">
             <span>Members ({members.length}/8)</span>
             <span className="text-[10px] text-outline">Cap: 8 squad mates</span>
           </h4>
-          <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
             {members.map((m) => (
               <div
-                key={m.id}
+                key={m.id || m.user_id}
                 className="p-2.5 rounded-2xl bg-surface-container-low border border-outline-variant/30 flex items-center justify-between"
               >
                 <div className="flex items-center gap-2.5">
                   <div className="w-7 h-7 rounded-full bg-secondary/20 text-secondary font-bold text-xs flex items-center justify-center">
-                    {m.user_name?.charAt(0).toUpperCase() || 'U'}
+                    {(m.user_name || m.display_name || 'U').charAt(0).toUpperCase()}
                   </div>
                   <span className="text-xs font-medium text-on-surface">
-                    {m.user_name} {m.user_id === currentUserId && '(You)'}
+                    {m.user_name || m.display_name} {m.user_id === currentUserId && '(You)'}
                   </span>
                 </div>
                 <span className="text-[10px] uppercase font-bold text-on-surface-variant bg-surface-container-high px-2 py-0.5 rounded-md">
-                  {m.role}
+                  {m.role || 'Member'}
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Action Buttons */}
-        <div className="pt-2 border-t border-outline-variant/20 flex flex-col gap-2">
+        {/* Danger Action Buttons */}
+        <div className="pt-3 border-t border-outline-variant/20 flex flex-col gap-2">
           <button
             onClick={handleLeave}
             disabled={loading}
