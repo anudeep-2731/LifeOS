@@ -15,6 +15,7 @@ import {
   fetchCirclePosts,
   publishDailySnapshot,
   fetchUserProfileName,
+  fetchUserProfileAvatar,
   getSupabase
 } from '../lib/supabase';
 
@@ -27,6 +28,7 @@ export default function CirclesTab() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserName, setCurrentUserName] = useState('');
+  const [userAvatarUrl, setUserAvatarUrl] = useState(null);
 
   // Dropdown & Modals state
   const [showSquadDropdown, setShowSquadDropdown] = useState(false);
@@ -52,8 +54,12 @@ export default function CirclesTab() {
         if (session) setCurrentUserId(session.user.id);
       }
 
-      const name = await fetchUserProfileName();
+      const [name, avatar] = await Promise.all([
+        fetchUserProfileName(),
+        fetchUserProfileAvatar(),
+      ]);
       if (name) setCurrentUserName(name);
+      if (avatar) setUserAvatarUrl(avatar);
 
       await publishDailySnapshot(todayStr).catch(console.error);
 
@@ -311,6 +317,7 @@ export default function CirclesTab() {
             const snap = snapshots[mem.user_id];
             const isDone = (snap?.routines_completed || 0) > 0;
             const displayName = mem.display_name || mem.user_name || 'Member';
+            const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
 
             return (
               <motion.button
@@ -323,8 +330,12 @@ export default function CirclesTab() {
                 <div className={`w-[60px] h-[60px] rounded-full p-[2.5px] flex items-center justify-center transition-transform active:scale-95 ${
                   isDone ? 'bg-secondary' : 'bg-primary-container'
                 }`}>
-                  <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner">
-                    {displayName[0].toUpperCase()}
+                  <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner overflow-hidden">
+                    {avatar ? (
+                      <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
+                    ) : (
+                      displayName[0].toUpperCase()
+                    )}
                   </div>
                 </div>
                 <span className="font-label text-xs text-on-surface max-w-[68px] truncate text-center font-medium">

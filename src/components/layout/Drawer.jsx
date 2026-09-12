@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../ui/Icon';
 import { db } from '../../db/database';
 import FinanceSettingsSheet from '../ui/FinanceSettingsSheet';
-import { getSupabase } from '../../lib/supabase';
+import { getSupabase, fetchUserProfileAvatar, updateUserProfileAvatar } from '../../lib/supabase';
+import { compressImage } from '../../lib/imageUtils';
 
 export default function Drawer({ isOpen, onClose }) {
   const [showFinanceSettings, setShowFinanceSettings] = useState(false);
   const [userName, setUserName] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [user, setUser] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
+  const fileInputRef = useRef(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -34,9 +38,29 @@ export default function Drawer({ isOpen, onClose }) {
           setUserName('');
         }
       }
+
+      const currentAvatar = await fetchUserProfileAvatar();
+      if (currentAvatar) setAvatarUrl(currentAvatar);
     };
     if (isOpen) loadUser();
   }, [isOpen]);
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const compressed = await compressImage(file);
+      const newAvatarUrl = await updateUserProfileAvatar(compressed);
+      setAvatarUrl(newAvatarUrl);
+    } catch (err) {
+      console.error('Failed to upload profile picture:', err);
+      alert('Could not upload profile picture. Please try another image.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleLogOut = async () => {
     const client = await getSupabase();
@@ -64,6 +88,15 @@ export default function Drawer({ isOpen, onClose }) {
 
   return (
     <>
+      {/* Hidden File Input for Avatar Upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/40 z-[60] backdrop-blur-sm transition-opacity animate-in fade-in"
@@ -76,13 +109,41 @@ export default function Drawer({ isOpen, onClose }) {
         {/* Header User Profile */}
         <div className="p-6 pt-12 flex items-center justify-between border-b border-outline-variant/10">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-12 h-12 rounded-full primary-gradient text-white flex items-center justify-center font-bold text-lg shadow-sm flex-shrink-0">
-              {initialLetter}
-            </div>
+            {/* Interactive Avatar Button with Camera Badge */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="relative group w-12 h-12 rounded-full primary-gradient text-white flex items-center justify-center font-bold text-lg shadow-sm flex-shrink-0 overflow-hidden border-2 border-white/40 active:scale-95 transition-transform"
+              title="Upload Profile Picture"
+            >
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+              ) : (
+                initialLetter
+              )}
+
+              {/* Camera Hover Badge */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity text-white">
+                {uploading ? (
+                  <Icon name="sync" className="animate-spin text-sm" />
+                ) : (
+                  <Icon name="photo_camera" className="text-sm" />
+                )}
+              </div>
+            </button>
+
             <div className="min-w-0 flex-1">
-              <h2 className="font-headline font-bold text-base text-on-surface truncate">
-                {userName || (user ? 'Account User' : 'Guest User')}
-              </h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="font-headline font-bold text-base text-on-surface truncate">
+                  {userName || (user ? 'Account User' : 'Guest User')}
+                </h2>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="text-primary hover:text-primary-container text-[11px] font-bold underline shrink-0"
+                >
+                  Edit Photo
+                </button>
+              </div>
               <p className="text-xs text-outline truncate">
                 {userEmail || 'Local Mode'}
               </p>
@@ -100,65 +161,71 @@ export default function Drawer({ isOpen, onClose }) {
 
           <button
             onClick={() => {
+              fileInputRef.current?.click();
+            }}
+            className="w-full p-3 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high transition-colors flex items-center justify-between text-left shadow-xs border border-outline-variant/15"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                <Icon name="account_circle" size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-headline font-bold text-on-surface">Upload Profile Picture</p>
+                <p className="text-[10px] text-outline">Change account avatar photo</p>
+              </div>
+            </div>
+            <Icon name="chevron_right" size={18} className="text-outline" />
+          </button>
+
+          <button
+            onClick={() => {
               onClose();
               setShowFinanceSettings(true);
             }}
-            className="w-full flex items-center gap-4 p-3.5 rounded-2xl bg-surface-container/60 hover:bg-surface-container-high transition-colors"
+            className="w-full p-3 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high transition-colors flex items-center justify-between text-left shadow-xs border border-outline-variant/15"
           >
-            <div className="w-10 h-10 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
-              <Icon name="tune" size={20} />
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-secondary/10 text-secondary flex items-center justify-center">
+                <Icon name="tune" size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-headline font-bold text-on-surface">Finance Settings</p>
+                <p className="text-[10px] text-outline">Target budget & categories</p>
+              </div>
             </div>
-            <div className="text-left flex-1 min-w-0">
-              <p className="text-sm font-bold text-on-surface">Finance Settings</p>
-              <p className="text-[10px] text-outline">Target budget & categories</p>
-            </div>
+            <Icon name="chevron_right" size={18} className="text-outline" />
           </button>
 
-          <div className="pt-6 border-t border-outline-variant/10 mt-4 space-y-3">
-            <p className="text-[10px] font-bold text-outline uppercase tracking-widest ml-2">Account Session</p>
-
-            {user ? (
-              <button
-                onClick={handleLogOut}
-                className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl bg-error/10 text-error hover:bg-error/20 font-bold text-xs transition-all border border-error/20"
-              >
-                <Icon name="logout" size={18} />
-                <span>Log Out</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => {
-                  onClose();
-                  navigate('/login');
-                }}
-                className="w-full flex items-center justify-center gap-2 p-3.5 rounded-2xl primary-gradient text-white font-bold text-xs transition-all shadow-sm"
-              >
-                <Icon name="login" size={18} />
-                <span>Log In / Create Account</span>
-              </button>
-            )}
-
-            <div className="p-3 bg-surface-container rounded-2xl mt-4">
-              <p className="text-xs text-on-surface font-semibold">Version 1.5.0 (LifeOS Cloud)</p>
-              <p className="text-[10px] text-outline mt-1 leading-relaxed">
-                Your local-first companion for mental, physical, and financial wellbeing.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Footer */}
-        <div className="p-6 text-center border-t border-outline-variant/10">
-          <p className="text-[10px] text-outline-variant font-medium uppercase tracking-widest">
-            Made with ❤️ for Peace
-          </p>
+        <div className="p-4 border-t border-outline-variant/10 flex flex-col gap-2">
+          {user ? (
+            <button
+              onClick={handleLogOut}
+              className="w-full py-3 px-4 rounded-2xl bg-error-container/40 text-error hover:bg-error-container transition-colors font-headline font-bold text-xs flex items-center justify-center gap-2"
+            >
+              <Icon name="logout" size={18} />
+              <span>Log Out</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                onClose();
+                navigate('/login');
+              }}
+              className="w-full py-3 px-4 rounded-2xl bg-primary text-on-primary font-headline font-bold text-xs flex items-center justify-center gap-2 shadow-sm"
+            >
+              <Icon name="login" size={18} />
+              <span>Log In / Sync</span>
+            </button>
+          )}
         </div>
       </div>
 
       <FinanceSettingsSheet
         isOpen={showFinanceSettings}
         onClose={() => setShowFinanceSettings(false)}
-        onSave={() => {}}
       />
     </>
   );

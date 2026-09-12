@@ -51,6 +51,37 @@ export const fetchUserProfileName = async () => {
   return cached?.value || 'User';
 };
 
+export const fetchUserProfileAvatar = async () => {
+  try {
+    const client = await getSupabase();
+    if (client) {
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.user?.user_metadata?.avatar_url) {
+        return session.user.user_metadata.avatar_url;
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching user avatar:', err);
+  }
+  const cached = await db.settings.get('user_avatar_url');
+  return cached?.value || null;
+};
+
+export const updateUserProfileAvatar = async (imageBlobOrFile) => {
+  const avatarUrl = await uploadCirclePhoto(imageBlobOrFile);
+  const client = await getSupabase();
+  if (client) {
+    const { data: { session } } = await client.auth.getSession();
+    if (session?.user) {
+      await client.auth.updateUser({
+        data: { avatar_url: avatarUrl }
+      }).catch(console.error);
+    }
+  }
+  await db.settings.put({ key: 'user_avatar_url', value: avatarUrl });
+  return avatarUrl;
+};
+
 // ─── SQL Schema Generator Script ──────────────────────────────────────────────
 export const SUPABASE_SQL_SCHEMA = `-- Execute this SQL script in Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql)
 
