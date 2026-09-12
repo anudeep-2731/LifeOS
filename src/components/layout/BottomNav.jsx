@@ -16,19 +16,30 @@ function NavigationItem({ to, icon, label }) {
   const isActive = !!useMatch(to);
 
   return (
-    <NavLink to={to} className="flex flex-col items-center justify-center py-1">
+    <NavLink to={to} className="flex flex-col items-center justify-center py-1 group flex-1">
       <motion.div
-        whileTap={{ scale: 0.92 }}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-all duration-200 ${
-          isActive
-            ? 'bg-[#d1e4ff] text-[#001c39] font-headline font-extrabold shadow-sm'
-            : 'text-[#44474e] hover:bg-surface-container-high'
-        }`}
+        whileTap={{ scale: 0.9 }}
+        className="flex flex-col items-center"
       >
-        <Icon name={icon} size={20} filled={isActive} />
-        <span className={`text-[10px] font-headline font-bold transition-all ${
-          isActive ? 'text-[#001c39] font-extrabold' : 'text-[#44474e]'
-        }`}>
+        {/* Icon container with active pill indicator */}
+        <div
+          className={`px-3 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${
+            isActive
+              ? 'bg-[#d1e4ff] text-[#001c39] shadow-xs'
+              : 'text-[#44474e] group-hover:bg-surface-container-high'
+          }`}
+        >
+          <Icon name={icon} size={22} filled={isActive} />
+        </div>
+
+        {/* Label ALWAYS BELOW the icon */}
+        <span
+          className={`text-[10px] font-headline tracking-tight mt-0.5 transition-colors ${
+            isActive
+              ? 'text-[#001c39] font-extrabold'
+              : 'text-[#44474e] font-semibold group-hover:text-on-surface'
+          }`}
+        >
           {label}
         </span>
       </motion.div>
@@ -42,7 +53,7 @@ function CenterCirclesItem() {
   return (
     <NavLink
       to="/circles"
-      className="relative -top-5 flex flex-col items-center justify-center group"
+      className="relative -top-5 flex flex-col items-center justify-center group flex-shrink-0 px-2"
     >
       <motion.div
         whileTap={{ scale: 0.92 }}
@@ -61,9 +72,11 @@ function CenterCirclesItem() {
         </span>
       </motion.div>
 
-      <span className={`text-[10px] font-headline font-extrabold tracking-wide mt-1 transition-colors ${
-        isActive ? 'text-primary font-black' : 'text-on-surface-variant font-bold'
-      }`}>
+      <span
+        className={`text-[10px] font-headline tracking-tight mt-1 transition-colors ${
+          isActive ? 'text-primary font-black' : 'text-on-surface-variant font-bold'
+        }`}
+      >
         Circles
       </span>
     </NavLink>
@@ -72,7 +85,7 @@ function CenterCirclesItem() {
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 w-full flex justify-around items-center px-2 pb-2.5 pt-2 bg-[#f8f9ff]/95 backdrop-blur-xl z-50 rounded-t-[2.5rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20">
+    <nav className="fixed bottom-0 left-0 right-0 w-full flex justify-around items-center px-1 pb-2 pt-1.5 bg-[#f8f9ff]/95 backdrop-blur-xl z-50 rounded-t-[2rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20">
       {NAV_ITEMS_LEFT.map(item => <NavigationItem key={item.to} {...item} />)}
       <CenterCirclesItem />
       {NAV_ITEMS_RIGHT.map(item => <NavigationItem key={item.to} {...item} />)}

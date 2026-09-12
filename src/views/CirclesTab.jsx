@@ -5,6 +5,7 @@ import CreateCircleModal from '../components/circles/CreateCircleModal';
 import JoinCircleModal from '../components/circles/JoinCircleModal';
 import CircleSettingsSheet from '../components/circles/CircleSettingsSheet';
 import MemberDetailSheet from '../components/circles/MemberDetailSheet';
+import SquadScorecardsModal from '../components/circles/SquadScorecardsModal';
 import PostComposer from '../components/circles/PostComposer';
 import CirclePostCard from '../components/circles/CirclePostCard';
 import {
@@ -25,7 +26,7 @@ function GangStoryBubble({ circle, isActive, onClick }) {
       className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer group"
     >
       <div
-        className={`relative w-[62px] h-[62px] rounded-full p-[3px] transition-all ${
+        className={`relative w-[60px] h-[60px] rounded-full p-[3px] transition-all ${
           isActive
             ? 'bg-gradient-to-tr from-pink-500 via-purple-500 to-primary shadow-md scale-105'
             : 'bg-surface-container-high hover:bg-outline-variant/40'
@@ -58,7 +59,7 @@ function AddGangStoryBubble({ onCreate, onJoin }) {
       <motion.button
         whileTap={{ scale: 0.92 }}
         onClick={() => setOpenMenu(prev => !prev)}
-        className="w-[62px] h-[62px] rounded-full bg-surface-container-low border-2 border-dashed border-primary/40 flex items-center justify-center text-primary hover:bg-primary/5 transition-colors"
+        className="w-[60px] h-[60px] rounded-full bg-surface-container-low border-2 border-dashed border-primary/40 flex items-center justify-center text-primary hover:bg-primary/5 transition-colors"
       >
         <Icon name="add" className="text-2xl" />
       </motion.button>
@@ -93,71 +94,6 @@ function AddGangStoryBubble({ onCreate, onJoin }) {
   );
 }
 
-// Compact Member Leaderboard Chip (in squad strip)
-function MemberLeaderboardChip({ member, snapshot, rank, isCurrentUser, onClick }) {
-  const routineScore = snapshot?.routine_score ?? 0;
-  const taskScore = snapshot?.task_score ?? 0;
-  const hasData = !!snapshot;
-  const avgScore = hasData ? Math.round((routineScore + taskScore) / 2) : null;
-  const finStatus = snapshot?.financial_status || null;
-
-  const ringColor = avgScore >= 80 ? '#006d36' : avgScore >= 50 ? '#d97706' : '#005da7';
-  const rankBadge = rank === 1 ? '👑' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '🔥';
-
-  return (
-    <motion.button
-      whileTap={{ scale: 0.94 }}
-      onClick={onClick}
-      className={`flex items-center gap-3 p-2.5 pr-4 rounded-2xl flex-shrink-0 transition-all border shadow-xs cursor-pointer ${
-        isCurrentUser
-          ? 'bg-primary/5 border-primary/30 text-on-surface ring-1 ring-primary/20'
-          : 'bg-surface-container-lowest border-outline-variant/20 hover:border-outline-variant/40'
-      }`}
-    >
-      <div
-        className="relative w-11 h-11 rounded-full p-[2px]"
-        style={{
-          background: hasData
-            ? `conic-gradient(${ringColor} ${avgScore}%, rgba(0,0,0,0.08) ${avgScore}%)`
-            : 'rgba(0,0,0,0.08)'
-        }}
-      >
-        <div className="w-full h-full rounded-full bg-surface-container-lowest flex items-center justify-center font-headline font-extrabold text-xs text-on-surface">
-          {member.user_name?.charAt(0).toUpperCase() || 'U'}
-        </div>
-        {hasData && (
-          <span className="absolute -bottom-1 -right-1 text-[11px] leading-none">
-            {rankBadge}
-          </span>
-        )}
-      </div>
-
-      <div className="text-left">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-headline font-bold text-on-surface max-w-[90px] truncate">
-            {isCurrentUser ? 'You' : member.user_name}
-          </span>
-          {finStatus === 'Over Budget' && (
-            <span className="w-2 h-2 rounded-full bg-error" title="Over Budget" />
-          )}
-          {finStatus === 'Warning' && (
-            <span className="w-2 h-2 rounded-full bg-amber-500" title="Warning" />
-          )}
-          {finStatus === 'On Track' && (
-            <span className="w-2 h-2 rounded-full bg-secondary" title="On Track" />
-          )}
-        </div>
-        <div className="flex items-center gap-1 mt-0.5">
-          <span className="text-[10px] font-extrabold" style={{ color: hasData ? ringColor : '#717783' }}>
-            {hasData ? `${avgScore}% score` : 'No check-in'}
-          </span>
-          <span className="text-[9px] text-on-surface-variant/60">• Inspect ➔</span>
-        </div>
-      </div>
-    </motion.button>
-  );
-}
-
 export default function CirclesTab() {
   const [circles, setCircles] = useState([]);
   const [selectedCircle, setSelectedCircle] = useState(null);
@@ -171,8 +107,9 @@ export default function CirclesTab() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
+  const [showScorecardsModal, setShowScorecardsModal] = useState(false);
   
-  // Member Detail Sheet (Scorecard bottom sheet)
+  // Member Detail Sheet
   const [selectedMemberDetail, setSelectedMemberDetail] = useState(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -223,28 +160,16 @@ export default function CirclesTab() {
     if (selectedCircle) loadCircleDetails(selectedCircle.id);
   }, [selectedCircle, loadCircleDetails]);
 
-  // Sort members by performance score for leaderboard order
-  const sortedMembers = [...members].sort((a, b) => {
-    const sA = snapshots[a.user_id];
-    const sB = snapshots[b.user_id];
-    const scoreA = sA ? (sA.routine_score + sA.task_score) / 2 : -1;
-    const scoreB = sB ? (sB.routine_score + sB.task_score) / 2 : -1;
-    return scoreB - scoreA;
-  });
-
   return (
     <div className="min-h-screen pb-28 bg-background">
       {/* ── TOP HEADER BAR ── */}
-      <div className="px-4 pt-5 pb-3 bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
+      <div className="px-4 pt-4 pb-3 bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
           <div>
             <h1 className="text-xl font-headline font-extrabold text-on-surface flex items-center gap-2">
               <span>Circles & Gangs</span>
-              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-primary/10 text-primary font-bold">
-                Social
-              </span>
             </h1>
-            <p className="text-xs text-on-surface-variant">Daily accountability with your close squad</p>
+            <p className="text-xs text-on-surface-variant">Daily accountability squad feed</p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -257,7 +182,7 @@ export default function CirclesTab() {
             </button>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-3.5 py-2 rounded-2xl bg-primary text-on-primary text-xs font-headline font-bold shadow-md hover:brightness-110 transition-all flex items-center gap-1.5"
+              className="px-3.5 py-2 rounded-2xl bg-primary text-on-primary text-xs font-headline font-bold shadow-md hover:brightness-110 transition-all flex items-center gap-1"
             >
               <Icon name="add" className="text-sm" />
               <span>Create</span>
@@ -266,7 +191,7 @@ export default function CirclesTab() {
         </div>
 
         {/* ── INSTAGRAM-STYLE GANG STORIES ROW ── */}
-        <div className="flex items-center gap-4 overflow-x-auto scrollbar-none py-1.5">
+        <div className="flex items-center gap-4 overflow-x-auto scrollbar-none py-1">
           <AddGangStoryBubble
             onCreate={() => setShowCreateModal(true)}
             onJoin={() => setShowJoinModal(true)}
@@ -292,7 +217,7 @@ export default function CirclesTab() {
           >
             <Icon name="sync" className="text-3xl text-primary mb-2" />
           </motion.div>
-          <p className="text-xs font-medium mt-2">Loading your gang feed…</p>
+          <p className="text-xs font-medium mt-2">Loading squad feed…</p>
         </div>
       ) : circles.length === 0 ? (
         /* Empty State */
@@ -307,7 +232,7 @@ export default function CirclesTab() {
           </motion.div>
           <h2 className="text-lg font-headline font-bold text-on-surface mb-1">No Gangs Joined Yet</h2>
           <p className="text-xs text-on-surface-variant max-w-xs leading-relaxed mb-8">
-            Create an 8-member circle or join an existing gang to share daily progress snaps and compete on scorecards!
+            Create an 8-member circle or join an existing gang to share daily progress snaps and tips!
           </p>
           <div className="flex gap-3">
             <button
@@ -328,11 +253,11 @@ export default function CirclesTab() {
         </div>
       ) : selectedCircle ? (
         <div className="px-4 pt-4">
-          {/* Active Circle Title & Settings Bar */}
-          <div className="flex items-center justify-between mb-4">
+          {/* Active Circle Title & Leaderboard Button */}
+          <div className="flex items-center justify-between mb-4 bg-surface-container-lowest p-3 rounded-2xl border border-outline-variant/20 shadow-xs">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-headline font-bold text-on-surface">
+                <h2 className="text-base font-headline font-bold text-on-surface">
                   {selectedCircle.name}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-bold">
@@ -340,52 +265,33 @@ export default function CirclesTab() {
                 </span>
               </div>
               {selectedCircle.description && (
-                <p className="text-xs text-on-surface-variant mt-0.5 line-clamp-1">
+                <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">
                   {selectedCircle.description}
                 </p>
               )}
             </div>
 
-            <button
-              onClick={() => setShowSettingsSheet(true)}
-              className="w-9 h-9 rounded-2xl bg-surface-container-lowest border border-outline-variant/20 hover:bg-surface-container-low text-on-surface-variant flex items-center justify-center transition-colors shadow-xs"
-              title="Circle Settings"
-            >
-              <Icon name="settings" className="text-base" />
-            </button>
-          </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowScorecardsModal(true)}
+                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all flex items-center gap-1 border border-primary/20"
+                title="View Squad Scorecards"
+              >
+                <span>🏆 Scorecards</span>
+              </button>
 
-          {/* ── SQUAD PERFORMANCE LEADERBOARD STRIP ── */}
-          <div className="mb-6">
-            <div className="flex items-center justify-between mb-2.5 px-0.5">
-              <h3 className="text-xs font-headline font-bold text-on-surface flex items-center gap-1.5">
-                <span>Squad Performance</span>
-                <span className="text-[10px] text-on-surface-variant font-normal">(Tap for detailed scorecard)</span>
-              </h3>
-            </div>
-
-            <div className="flex items-center gap-3 overflow-x-auto scrollbar-none pb-2 pt-0.5">
-              {sortedMembers.map((member, idx) => (
-                <MemberLeaderboardChip
-                  key={member.id}
-                  member={member}
-                  snapshot={snapshots[member.user_id]}
-                  rank={idx + 1}
-                  isCurrentUser={member.user_id === currentUserId}
-                  onClick={() => setSelectedMemberDetail(member)}
-                />
-              ))}
+              <button
+                onClick={() => setShowSettingsSheet(true)}
+                className="w-8 h-8 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors"
+                title="Circle Settings"
+              >
+                <Icon name="settings" className="text-base" />
+              </button>
             </div>
           </div>
 
-          {/* ── INSTAGRAM SNAP FEED SECTION ── */}
+          {/* ── INSTAGRAM SNAP & WISDOM FEED ── */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between px-0.5">
-              <h3 className="text-xs font-headline font-bold text-on-surface flex items-center gap-1.5">
-                <span>📸 Activity & Snaps</span>
-              </h3>
-            </div>
-
             {/* Post Composer */}
             <PostComposer
               circleId={selectedCircle.id}
@@ -395,10 +301,10 @@ export default function CirclesTab() {
             {/* Feed Posts */}
             {posts.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant/60 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-outline-variant/30">
-                <span className="text-4xl mb-3">📷</span>
+                <span className="text-4xl mb-3">📸</span>
                 <p className="text-sm font-headline font-bold text-on-surface">No snaps shared today</p>
                 <p className="text-xs text-on-surface-variant mt-1 max-w-xs">
-                  Snap a photo of your workout, meal, or productivity milestone above to motivate your gang!
+                  Snap a photo of your workout or share a squad advice tip above!
                 </p>
               </div>
             ) : (
@@ -442,6 +348,15 @@ export default function CirclesTab() {
         members={members}
         currentUserId={currentUserId}
         onCircleUpdated={loadData}
+      />
+      <SquadScorecardsModal
+        isOpen={showScorecardsModal}
+        onClose={() => setShowScorecardsModal(false)}
+        circle={selectedCircle}
+        members={members}
+        snapshots={snapshots}
+        currentUserId={currentUserId}
+        onSelectMember={(member) => setSelectedMemberDetail(member)}
       />
       <MemberDetailSheet
         isOpen={!!selectedMemberDetail}
