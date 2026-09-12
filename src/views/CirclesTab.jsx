@@ -4,7 +4,6 @@ import Icon from '../components/ui/Icon';
 import CreateCircleModal from '../components/circles/CreateCircleModal';
 import JoinCircleModal from '../components/circles/JoinCircleModal';
 import CircleSettingsSheet from '../components/circles/CircleSettingsSheet';
-import MemberDetailSheet from '../components/circles/MemberDetailSheet';
 import SquadScorecardsModal from '../components/circles/SquadScorecardsModal';
 import PostComposer from '../components/circles/PostComposer';
 import CirclePostCard from '../components/circles/CirclePostCard';
@@ -14,7 +13,6 @@ import {
   fetchCircleMembers,
   fetchCircleDailySnapshots,
   fetchCirclePosts,
-  createCirclePost,
   publishDailySnapshot,
   fetchUserProfileName,
   getSupabase
@@ -30,7 +28,7 @@ export default function CirclesTab() {
   const [currentUserId, setCurrentUserId] = useState(null);
   const [currentUserName, setCurrentUserName] = useState('');
 
-  // Modals state
+  // Modals & Composer state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
@@ -106,16 +104,12 @@ export default function CirclesTab() {
     }
   };
 
-  const handleCreatePost = async (postData) => {
-    if (!selectedCircle) return;
-    await createCirclePost({
-      circleId: selectedCircle.id,
-      postType: postData.postType || 'photo',
-      caption: postData.content,
-      photoUrl: postData.mediaUrl || null,
-    });
-    setShowComposer(false);
-    loadData();
+  const handleToggleComposer = () => {
+    if (!selectedCircle) {
+      setShowCreateModal(true);
+    } else {
+      setShowComposer(prev => !prev);
+    }
   };
 
   // Calculate squad momentum & active counts
@@ -146,15 +140,16 @@ export default function CirclesTab() {
           <button
             onClick={() => setShowSettingsSheet(true)}
             className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+            title="Circle Settings"
           >
             <Icon name="tune" size={20} />
           </button>
           <button
-            onClick={() => setShowComposer(true)}
+            onClick={handleToggleComposer}
             className="flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label text-xs font-bold shadow-sm active:scale-95 transition-transform"
           >
-            <Icon name="add" size={16} />
-            <span>Post</span>
+            <Icon name={showComposer ? "close" : "add"} size={16} />
+            <span>{showComposer ? "Cancel" : "Post"}</span>
           </button>
         </div>
       </header>
@@ -274,7 +269,27 @@ export default function CirclesTab() {
         <span>🏆 Squad Scorecards · Weekly Leaderboard</span>
       </button>
 
-      {/* 5. SOCIAL FEED */}
+      {/* 5. POST COMPOSER CARD (Visible when showComposer is true or always ready) */}
+      <AnimatePresence>
+        {showComposer && selectedCircle && (
+          <motion.div
+            initial={{ opacity: 0, height: 0, y: -10 }}
+            animate={{ opacity: 1, height: 'auto', y: 0 }}
+            exit={{ opacity: 0, height: 0, y: -10 }}
+            className="overflow-hidden"
+          >
+            <PostComposer
+              circleId={selectedCircle.id}
+              onPostCreated={() => {
+                setShowComposer(false);
+                loadData();
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* 6. SOCIAL FEED */}
       <div className="flex flex-col gap-4">
         {posts.length === 0 ? (
           <div className="p-6 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-xs">
@@ -284,7 +299,7 @@ export default function CirclesTab() {
               Be the first to share your progress or post a workout proof to motivate your squad!
             </p>
             <button
-              onClick={() => setShowComposer(true)}
+              onClick={handleToggleComposer}
               className="mt-3 px-4 py-2 bg-primary text-white rounded-full font-label text-xs font-bold shadow-sm active:scale-95 transition-transform"
             >
               Post Progress
@@ -296,7 +311,7 @@ export default function CirclesTab() {
               key={post.id}
               post={post}
               currentUserId={currentUserId}
-              onReactionToggle={() => loadData()}
+              onPostUpdated={() => loadData()}
             />
           ))
         )}
@@ -313,12 +328,6 @@ export default function CirclesTab() {
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
         onJoined={() => loadData()}
-      />
-
-      <PostComposer
-        isOpen={showComposer}
-        onClose={() => setShowComposer(false)}
-        onSubmit={handleCreatePost}
       />
 
       <SquadScorecardsModal
