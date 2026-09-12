@@ -1,94 +1,94 @@
-import { NavLink, useMatch } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Icon from '../ui/Icon';
 
-const NAV_ITEMS_LEFT = [
-  { to: '/dashboard', icon: 'home', label: 'Home' },
-  { to: '/schedule', icon: 'calendar_month', label: 'Schedule' },
-];
-
-const NAV_ITEMS_RIGHT = [
-  { to: '/expenses', icon: 'receipt_long', label: 'Expenses' },
-  { to: '/portfolio', icon: 'account_balance', label: 'Portfolio' },
-];
-
-function NavigationItem({ to, icon, label }) {
-  const isActive = !!useMatch(to);
-
-  return (
-    <NavLink to={to} className="flex flex-col items-center justify-center py-1 group flex-1">
-      <motion.div
-        whileTap={{ scale: 0.9 }}
-        className="flex flex-col items-center"
-      >
-        {/* Icon container with active pill indicator */}
-        <div
-          className={`px-3 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${
-            isActive
-              ? 'bg-[#d1e4ff] text-[#001c39] shadow-xs'
-              : 'text-[#44474e] group-hover:bg-surface-container-high'
-          }`}
-        >
-          <Icon name={icon} size={22} filled={isActive} />
-        </div>
-
-        {/* Label ALWAYS BELOW the icon */}
-        <span
-          className={`text-[10px] font-headline tracking-tight mt-0.5 transition-colors ${
-            isActive
-              ? 'text-[#001c39] font-extrabold'
-              : 'text-[#44474e] font-semibold group-hover:text-on-surface'
-          }`}
-        >
-          {label}
-        </span>
-      </motion.div>
-    </NavLink>
-  );
-}
-
-function CenterCirclesItem() {
-  const isActive = !!useMatch('/circles');
-
-  return (
-    <NavLink
-      to="/circles"
-      className="relative -top-5 flex flex-col items-center justify-center group flex-shrink-0 px-2"
-    >
-      <motion.div
-        whileTap={{ scale: 0.92 }}
-        className={`relative w-14 h-14 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 transform group-hover:scale-105 ${
-          isActive
-            ? 'bg-gradient-to-tr from-primary via-blue-600 to-indigo-500 text-white shadow-primary/40 ring-4 ring-primary/20 scale-105'
-            : 'bg-gradient-to-tr from-slate-800 to-slate-900 text-white shadow-slate-900/30 hover:shadow-primary/30'
-        }`}
-      >
-        <Icon name="groups" size={26} filled={isActive} />
-        
-        {/* Unread Activity Pulsing Dot */}
-        <span className="absolute top-1 right-1 flex h-3.5 w-3.5">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-pink-500 border-2 border-slate-900"></span>
-        </span>
-      </motion.div>
-
-      <span
-        className={`text-[10px] font-headline tracking-tight mt-1 transition-colors ${
-          isActive ? 'text-primary font-black' : 'text-on-surface-variant font-bold'
-        }`}
-      >
-        Circles
-      </span>
-    </NavLink>
-  );
-}
-
 export default function BottomNav() {
+  const location = useLocation();
+  const path = location.pathname;
+
+  const isTodayActive = path === '/today' || path === '/dashboard' || path === '/';
+  const isGangActive = path === '/gang' || path === '/circles';
+  const isMoneyActive = path === '/money' || path === '/expenses' || path === '/portfolio';
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 w-full flex justify-around items-center px-1 pb-2 pt-1.5 bg-[#f8f9ff]/95 backdrop-blur-xl z-50 rounded-t-[2rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20">
-      {NAV_ITEMS_LEFT.map(item => <NavigationItem key={item.to} {...item} />)}
-      <CenterCirclesItem />
-      {NAV_ITEMS_RIGHT.map(item => <NavigationItem key={item.to} {...item} />)}
+    <nav className="fixed bottom-0 inset-x-0 z-50 pb-safe bg-[#f8f9fc]/95 backdrop-blur-xl rounded-t-[2rem] shadow-[0_-4px_24px_rgba(0,0,0,0.06)] border-t border-outline-variant/20">
+      <div className="flex items-center justify-around h-20 px-4 relative">
+        {/* Today Tab */}
+        <NavLink
+          to="/today"
+          className={`group flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors ${
+            isTodayActive ? 'text-primary font-bold' : 'text-on-surface-variant'
+          }`}
+        >
+          <motion.div whileTap={{ scale: 0.92 }} className="flex flex-col items-center">
+            <div
+              className={`flex items-center justify-center px-3 py-1 rounded-full transition-all duration-200 ${
+                isTodayActive ? 'bg-primary/10 text-primary' : 'text-inherit group-hover:bg-surface-container'
+              }`}
+            >
+              <Icon name="wb_sunny" size={22} filled={isTodayActive} />
+            </div>
+            <span className="text-[11px] font-label-sm mt-0.5 tracking-tight text-inherit">
+              Today
+            </span>
+          </motion.div>
+        </NavLink>
+
+        {/* Gang Center FAB */}
+        <NavLink
+          to="/gang"
+          className="group flex flex-col items-center justify-center min-w-[56px] min-h-[44px] -mt-5 transition-colors"
+        >
+          <motion.div whileTap={{ scale: 0.92 }} className="relative flex flex-col items-center">
+            <div className="relative flex items-center justify-center">
+              <div
+                className={`w-14 h-14 rounded-full flex items-center justify-center shadow-[0_8px_20px_rgba(15,23,42,0.25)] transition-transform duration-150 ${
+                  isGangActive
+                    ? 'bg-gradient-to-b from-primary via-indigo-600 to-slate-900 ring-4 ring-primary/20 scale-105'
+                    : 'bg-gradient-to-b from-slate-800 to-slate-900'
+                }`}
+              >
+                <Icon name="groups" size={24} className="text-white" filled={isGangActive} />
+              </div>
+
+              {/* Pulsing Unread Activity Indicator */}
+              <span className="absolute top-0 right-0 flex h-3 w-3 -mt-0.5 -mr-0.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500 ring-2 ring-white"></span>
+              </span>
+            </div>
+
+            <span
+              className={`text-[11px] font-label-sm mt-1 tracking-tight transition-colors ${
+                isGangActive ? 'text-primary font-bold' : 'text-on-surface-variant font-medium'
+              }`}
+            >
+              Gang
+            </span>
+          </motion.div>
+        </NavLink>
+
+        {/* Money Tab */}
+        <NavLink
+          to="/money"
+          className={`group flex flex-col items-center justify-center min-w-[56px] min-h-[44px] transition-colors ${
+            isMoneyActive ? 'text-primary font-bold' : 'text-on-surface-variant'
+          }`}
+        >
+          <motion.div whileTap={{ scale: 0.92 }} className="flex flex-col items-center">
+            <div
+              className={`flex items-center justify-center px-3 py-1 rounded-full transition-all duration-200 ${
+                isMoneyActive ? 'bg-primary/10 text-primary' : 'text-inherit group-hover:bg-surface-container'
+              }`}
+            >
+              <Icon name="payments" size={22} filled={isMoneyActive} />
+            </div>
+            <span className="text-[11px] font-label-sm mt-0.5 tracking-tight text-inherit">
+              Money
+            </span>
+          </motion.div>
+        </NavLink>
+      </div>
     </nav>
   );
 }

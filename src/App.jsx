@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import TopBar from './components/layout/TopBar';
 import BottomNav from './components/layout/BottomNav';
-import DashboardTab from './views/DashboardTab';
-import ScheduleTab from './views/ScheduleTab';
+import TodayScreen from './views/TodayScreen';
+import GangScreen from './views/GangScreen';
+import MoneyScreen from './views/MoneyScreen';
+import RoutineStudioScreen from './views/RoutineStudioScreen';
 import ExpensesTab from './views/ExpensesTab';
 import PortfolioTab from './views/PortfolioTab';
-import CirclesTab from './views/CirclesTab';
 import AuthView from './views/AuthView';
 import { getSupabase, migrateLocalDataToSupabase } from './lib/supabase';
 
@@ -43,7 +44,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex flex-col justify-center items-center">
-        <div className="animate-spin text-primary text-2xl font-bold">LifeOS...</div>
+        <div className="animate-spin text-primary text-2xl font-bold font-headline">LifeOS...</div>
       </div>
     );
   }
@@ -51,39 +52,50 @@ function AppContent() {
   const isAuthPage = location.pathname === '/login';
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background text-on-surface">
       {!isAuthPage && session && <TopBar />}
-      <main className={!isAuthPage && session ? 'pt-16 pb-32' : ''}>
+      <main className={!isAuthPage && session ? 'pt-16 pb-28' : ''}>
         <Routes>
           <Route path="/login" element={<AuthView onAuthSuccess={() => {}} />} />
 
+          {/* Primary 3-Tab Routes */}
           <Route
-            path="/dashboard"
-            element={session ? <DashboardTab /> : <Navigate to="/login" replace />}
+            path="/today"
+            element={session ? <TodayScreen /> : <Navigate to="/login" replace />}
           />
           <Route
-            path="/schedule"
-            element={session ? <ScheduleTab /> : <Navigate to="/login" replace />}
+            path="/gang"
+            element={session ? <GangScreen /> : <Navigate to="/login" replace />}
           />
           <Route
-            path="/expenses"
+            path="/money"
+            element={session ? <MoneyScreen /> : <Navigate to="/login" replace />}
+          />
+
+          {/* Sub-screen & Routine Studio */}
+          <Route
+            path="/routine-studio"
+            element={session ? <RoutineStudioScreen /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/expenses-history"
             element={session ? <ExpensesTab /> : <Navigate to="/login" replace />}
           />
           <Route
             path="/portfolio"
             element={session ? <PortfolioTab /> : <Navigate to="/login" replace />}
           />
-          <Route
-            path="/circles"
-            element={session ? <CirclesTab /> : <Navigate to="/login" replace />}
-          />
 
-          {/* Legacy route redirects */}
-          <Route path="/money"     element={<Navigate to="/expenses" replace />} />
-          <Route path="/morning"   element={<Navigate to="/schedule" replace />} />
-          <Route path="/tasks"     element={<Navigate to="/schedule" replace />} />
-          <Route path="/nutrition" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/"          element={<Navigate to={session ? "/dashboard" : "/login"} replace />} />
+          {/* Legacy route redirects for backwards compatibility */}
+          <Route path="/dashboard" element={<Navigate to="/today" replace />} />
+          <Route path="/schedule"  element={<Navigate to="/routine-studio" replace />} />
+          <Route path="/circles font-bold"   element={<Navigate to="/gang" replace />} />
+          <Route path="/circles"   element={<Navigate to="/gang" replace />} />
+          <Route path="/expenses"  element={<Navigate to="/money" replace />} />
+          <Route path="/morning"   element={<Navigate to="/routine-studio" replace />} />
+          <Route path="/tasks"     element={<Navigate to="/routine-studio" replace />} />
+          <Route path="/nutrition" element={<Navigate to="/today" replace />} />
+          <Route path="/"          element={<Navigate to={session ? "/today" : "/login"} replace />} />
         </Routes>
       </main>
       {!isAuthPage && session && <BottomNav />}
