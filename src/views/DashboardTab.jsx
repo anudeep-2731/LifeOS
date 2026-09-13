@@ -1,21 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import QuickLoggerBar from '../components/ui/QuickLoggerBar';
-import LifeHealthDiagnosticCard from '../components/dashboard/LifeHealthDiagnosticCard';
 import DailyFocusBriefingModal from '../components/dashboard/DailyFocusBriefingModal';
+import HabitTaskStudioSheet from '../components/schedule/HabitTaskStudioSheet';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
 import { 
   fetchCloudExpenses, 
   fetchCloudSchedule, 
-  computeCloudPortfolioNetWorth, 
-  getCloudExpiringPerks, 
+  addCloudScheduleItem,
   updateCloudScheduleItem,
   fetchCloudSetting,
   fetchUserProfileName,
-  publishDailySnapshot
+  publishDailySnapshot,
+  autoPopulateDailyRoutines
 } from '../lib/supabase';
-import { askGemini } from '../lib/ai';
 import { cn } from '../lib/utils';
 
 const getGreeting = () => {
@@ -28,319 +27,682 @@ const getGreeting = () => {
 
 const formatINR = (val) => '₹' + Number(val || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 });
 
-export default function DashboardTab() {
-  const [monthSpent, setMonthSpent] = useState(0);
-  const [todaySpent, setTodaySpent] = useState(0);
-  const [pendingItems, setPendingItems] = useState([]);
-  const [totalRoutines, setTotalRoutines] = useState(0);
-  const [routinesCompleted, setRoutinesCompleted] = useState(0);
-  const [expiringPerks, setExpiringPerks] = useState([]);
-  const [aiInsight, setAiInsight] = useState(null);
-  const [streak, setStreak] = useState(null);
-  const [netWorth, setNetWorth] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [showBriefingModal, setShowBriefingModal] = useState(false);
-  const [monthlyBudget, setMonthlyBudget] = useState(30000);
-  const [userName, setUserName] = useState('');
+const getHabitEmoji = (title = '', category = '') => {
+  const text = `${title} ${category}`.toLowerCase();
+  if (text.includes('water') || text.includes('hydrat')) return '💧';
+  if (text.includes('meditat') || text.includes('mindful') || text.includes('breath') || text.includes('yoga')) return '🧘';
+  if (text.includes('shower') || text.includes('bath') || text.includes('cold') || text.includes('hygiene')) return '❄️';
+  if (text.includes('run') || text.includes('walk') || text.includes('jog') || text.includes('workout') || text.includes('gym') || text.includes('exercise')) return '🏃';
+  if (text.includes('read') || text.includes('book') || text.includes('page') || text.includes('study')) return '📖';
+  if (text.includes('sleep') || text.includes('bed') || text.includes('rest')) return '😴';
+  if (text.includes('journal') || text.includes('write') || text.includes('diary')) return '✍️';
+  if (text.includes('breakfast') || text.includes('nutrition') || text.includes('meal') || text.includes('eat')) return '🥗';
+  if (text.includes('deep work') || text.includes('code') || text.includes('focus') || text.includes('work')) return '💻';
+  
+  // Check if string begins with an emoji
+  const emojiMatch = title.match(/^(\p{Emoji_Presentation}|\p{Extended_Pictographic})/u);
+  if (emojiMatch) return emojiMatch[0];
+  return '⚡';
+};
 
+const priorityScore = (priority = '') => {
+  const p = priority.toLowerCase();
+  if (p === 'high') return 3;
+  if (p === 'med' || p === 'medium') return 2;
+  return 1;
+};
+
+export default function DashboardTab() {
   const navigate = useNavigate();
   const today = getTodayStr();
   const currentMonth = getMonthStr();
-  const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
-  const loadHomeData = async () => {
+  // State
+  const [userName, setUserName] = useState('');
+  const [streak, setStreak] = useState(0);
+  const [monthlyBudget, setMonthlyBudget] = useState(30000);
+  const [monthSpent, setMonthSpent] = useState(0);
+  const [todaySpent, setTodaySpent] = useState(0);
+
+  // Schedule Items
+  const [routines, setRoutines] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Quick Task Add State
+  const [newTaskInput, setNewTaskInput] = useState('');
+  const [selectedPriority, setSelectedPriority] = useState('high'); // 'high' | 'med' | 'low'
+  const [isSubmittingTask, setIsSubmittingTask] = useState(false);
+
+  // Completed Accordion
+  const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false);
+
+  // Modals
+  const [showBriefingModal, setShowBriefingModal] = useState(false);
+  const [showStudioSheet, setShowStudioSheet] = useState(false);
+
+  // Formatted Date
+  const dateStr = useMemo(() => {
+    return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  }, []);
+
+  // Safe to Spend Calculation
+  const { safeToSpendToday, isOnTrack } = useMemo(() => {
+    const now = new Date();
+    const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const currentDay = now.getDate();
+    const daysRemaining = Math.max(1, totalDays - currentDay + 1);
+    const remainingBudget = Math.max(0, monthlyBudget - monthSpent);
+    const safe = Math.round(remainingBudget / daysRemaining);
+    return {
+      safeToSpendToday: safe,
+      isOnTrack: todaySpent <= safe || safe > 0
+    };
+  }, [monthlyBudget, monthSpent, todaySpent]);
+
+  // Load All Cockpit Data
+  const loadCockpitData = useCallback(async () => {
     setLoading(true);
-    await seedTodayData();
+    try {
+      await seedTodayData();
+      await autoPopulateDailyRoutines(today);
 
-    const profileName = await fetchUserProfileName();
-    setUserName(profileName);
+      const [profileName, budgetVal, streakVal, monthExpenses, schedData] = await Promise.all([
+        fetchUserProfileName(),
+        fetchCloudSetting('monthlyBudget', 30000),
+        computeStreak(),
+        fetchCloudExpenses(currentMonth),
+        fetchCloudSchedule(today)
+      ]);
 
-    // Auto-publish circle daily snapshot
-    publishDailySnapshot(today).catch(console.error);
-
-    // Fetch cloud-synced monthly budget
-    const b = await fetchCloudSetting('monthlyBudget', 30000);
-    if (b !== undefined && b !== null) setMonthlyBudget(b);
-
-    // 1. Fetch Month Expenses & Today Expenses
-    const monthExpenses = await fetchCloudExpenses(currentMonth);
-    const mSpent = monthExpenses.reduce((s, e) => s + e.amount, 0);
-    const tSpent = monthExpenses.filter(e => e.date === today).reduce((s, e) => s + e.amount, 0);
-    setMonthSpent(mSpent);
-    setTodaySpent(tSpent);
-
-    // 2. Fetch Today's Uncompleted Tasks & Routines
-    const [schedData, streakVal, perks, nwData] = await Promise.all([
-      fetchCloudSchedule(today),
-      computeStreak(),
-      getCloudExpiringPerks(30),
-      computeCloudPortfolioNetWorth(),
-    ]);
-
-    const routines = schedData.routines || [];
-    setTotalRoutines(routines.length);
-    setRoutinesCompleted(routines.filter(r => r.completed).length);
-
-    const uncompletedRoutines = routines
-      .filter(r => !r.completed)
-      .map(r => ({ 
-        ...r, 
-        id: r.id, 
-        itemType: 'routine', 
-        title: r.title, 
-        description: r.notes || r.description || '',
-        time: r.start || '08:00', 
-        tag: 'Habit Routine', 
-        color: 'text-emerald-400 bg-emerald-500/10' 
-      }));
-
-    const uncompletedTasks = (schedData.tasks || [])
-      .filter(t => !t.completed)
-      .map(t => ({ 
-        ...t, 
-        id: t.id, 
-        itemType: 'task', 
-        title: t.title, 
-        description: t.notes || t.description || '',
-        time: t.scheduledTime || '10:00', 
-        tag: `${t.priority || 'Medium'} Priority`, 
-        color: 'text-primary bg-primary/10' 
-      }));
-
-    const mergedPending = [...uncompletedRoutines, ...uncompletedTasks];
-    mergedPending.sort((a, b) => (a.time || '00:00').localeCompare(b.time || '00:00'));
-
-    setPendingItems(mergedPending);
-    setStreak(streakVal);
-    setExpiringPerks(perks);
-    setNetWorth(nwData.combinedNetWorth);
-
-    // Auto-popup Daily Briefing on first view of the day
-    const briefingKey = `briefing_seen_${today}`;
-    const briefingSeen = await db.settings.get(briefingKey);
-    if (!briefingSeen?.value) {
-      setShowBriefingModal(true);
-    }
-
-    // 3. AI Insight
-    const insightKey = `aiInsight_${today}`;
-    const cached = await db.settings.get(insightKey);
-    if (cached) {
-      setAiInsight(cached.value);
-    } else {
-      const tip = await askGemini(`Concise daily coach for productivity & money. Context: ₹${mSpent} spent this month, ${mergedPending.length} pending tasks today. Max 18 words.`);
-      if (tip) {
-        const clean = tip.trim().replace(/^["']|["']$/g, '');
-        await db.settings.put({ key: insightKey, value: clean });
-        setAiInsight(clean);
+      setUserName(profileName || 'Anudeep');
+      if (budgetVal !== undefined && budgetVal !== null) {
+        setMonthlyBudget(budgetVal);
       }
-    }
+      setStreak(streakVal || 0);
 
-    setLoading(false);
-  };
+      // Financials
+      const mSpent = monthExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      const tSpent = monthExpenses
+        .filter(e => e.date === today)
+        .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+      setMonthSpent(mSpent);
+      setTodaySpent(tSpent);
+
+      // Schedule Items
+      setRoutines(schedData.routines || []);
+      setTasks(schedData.tasks || []);
+
+      // Auto-publish circle snapshot
+      publishDailySnapshot(today).catch(console.error);
+
+      // Daily Briefing modal check
+      const briefingKey = `briefing_seen_${today}`;
+      const briefingSeen = await db.settings.get(briefingKey);
+      if (!briefingSeen?.value) {
+        setShowBriefingModal(true);
+      }
+    } catch (err) {
+      console.error('Error loading cockpit data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [today, currentMonth]);
 
   useEffect(() => {
-    loadHomeData();
-  }, []);
+    loadCockpitData();
+  }, [loadCockpitData]);
+
+  // Momentum Stats
+  const { totalItemsCount, completedCount, progressPercent, nextUpItem } = useMemo(() => {
+    const all = [...routines, ...tasks];
+    const total = all.length;
+    const completed = all.filter(i => i.completed).length;
+    const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // Find next uncompleted item
+    const uncompleted = all
+      .filter(i => !i.completed)
+      .sort((a, b) => {
+        const timeA = a.start || a.scheduledTime || a.time || '23:59';
+        const timeB = b.start || b.scheduledTime || b.time || '23:59';
+        return timeA.localeCompare(timeB);
+      });
+
+    return {
+      totalItemsCount: total,
+      completedCount: completed,
+      progressPercent: percent,
+      nextUpItem: uncompleted.length > 0 ? uncompleted[0] : null
+    };
+  }, [routines, tasks]);
+
+  // Split Tasks: Active (Priority-Sorted) vs Completed
+  const { activeTasks, completedTasks } = useMemo(() => {
+    const active = tasks
+      .filter(t => !t.completed)
+      .sort((a, b) => {
+        const scoreDiff = priorityScore(b.priority) - priorityScore(a.priority);
+        if (scoreDiff !== 0) return scoreDiff;
+        const timeA = a.scheduledTime || a.time || '12:00';
+        const timeB = b.scheduledTime || b.time || '12:00';
+        return timeA.localeCompare(timeB);
+      });
+
+    const completed = tasks.filter(t => t.completed);
+    return { activeTasks: active, completedTasks: completed };
+  }, [tasks]);
+
+  // Habit completion count
+  const habitsCompletedCount = useMemo(() => {
+    return routines.filter(r => r.completed).length;
+  }, [routines]);
+
+  // Toggle Habit
+  const handleToggleHabit = async (habit) => {
+    const nextCompleted = !habit.completed;
+    // Optimistic UI update
+    setRoutines(prev => prev.map(r => r.id === habit.id ? { ...r, completed: nextCompleted } : r));
+
+    try {
+      await updateCloudScheduleItem(habit.id, { ...habit, completed: nextCompleted });
+      publishDailySnapshot(today).catch(console.error);
+    } catch (err) {
+      console.error('Error toggling habit:', err);
+      // Revert on error
+      setRoutines(prev => prev.map(r => r.id === habit.id ? { ...r, completed: !nextCompleted } : r));
+    }
+  };
+
+  // Toggle Task
+  const handleToggleTask = async (task) => {
+    const nextCompleted = !task.completed;
+    // Optimistic UI update
+    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t));
+
+    try {
+      await updateCloudScheduleItem(task.id, { ...task, completed: nextCompleted });
+      publishDailySnapshot(today).catch(console.error);
+    } catch (err) {
+      console.error('Error toggling task:', err);
+      // Revert on error
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: !nextCompleted } : t));
+    }
+  };
+
+  // Quick Add Task
+  const handleQuickAddTask = async (e) => {
+    if (e) e.preventDefault();
+    const title = newTaskInput.trim();
+    if (!title || isSubmittingTask) return;
+
+    setIsSubmittingTask(true);
+    const priorityLabel = selectedPriority === 'high' ? 'High' : selectedPriority === 'med' ? 'Medium' : 'Low';
+    
+    try {
+      const created = await addCloudScheduleItem({
+        itemType: 'task',
+        title,
+        date: today,
+        dueDate: today,
+        scheduledTime: 'Today',
+        duration: 20,
+        category: 'Inbox',
+        priority: priorityLabel,
+        completed: false
+      });
+
+      if (created) {
+        setTasks(prev => [created, ...prev]);
+      } else {
+        await loadCockpitData();
+      }
+      setNewTaskInput('');
+    } catch (err) {
+      console.error('Error adding task:', err);
+    } finally {
+      setIsSubmittingTask(false);
+    }
+  };
 
   const handleCloseBriefing = async () => {
     await db.settings.put({ key: `briefing_seen_${today}`, value: true });
     setShowBriefingModal(false);
   };
 
-  const handleToggleItem = async (item) => {
-    await updateCloudScheduleItem(item.id, { ...item, completed: true });
-    loadHomeData();
-  };
-
   return (
-    <div className="min-h-screen flex flex-col pb-28">
-      <div className="px-4 sm:px-6 pt-5 space-y-6">
+    <div className="w-full min-h-screen bg-surface font-body text-on-surface antialiased flex flex-col pb-28">
+      <main className="flex flex-col relative w-full max-w-4xl mx-auto px-4 sm:px-6 transition-all duration-300">
+        <div className="flex flex-col w-full gap-5 pb-8">
 
-        {/* Greeting Header */}
-        <div className="flex justify-between items-end gap-2">
-          <div>
-            <h1 className="text-2xl font-headline font-extrabold text-on-surface">
-              {getGreeting()}, {userName || 'User'}
-            </h1>
-            <p className="text-xs text-outline mt-0.5">{dateStr}</p>
-          </div>
-          
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={() => setShowBriefingModal(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-xs font-bold text-primary border border-primary/20 shadow-xs transition-all"
-              title="Today's Executive Briefing"
-            >
-              <Icon name="center_focus_strong" size={15} />
-              <span>Daily Briefing</span>
-            </button>
-
-            <div className="flex items-center gap-1 bg-surface-container-high px-3 py-1.5 rounded-full text-xs font-bold text-primary">
-              <Icon name="local_fire_department" size={16} className="text-amber-500" />
-              <span>{streak || 0} Day Streak</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Action Logger Bar (1-Tap Water Hydration & Quick Expense Input) */}
-        <QuickLoggerBar onExpenseLogged={loadHomeData} />
-
-        {/* Card 1: Total Expense This Month */}
-        <div
-          onClick={() => navigate('/expenses')}
-          className="bg-surface-container-lowest rounded-3xl p-6 border border-outline-variant/30 shadow-card hover:border-primary/40 cursor-pointer transition-all relative overflow-hidden group"
-        >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-16 translate-x-16 group-hover:scale-110 transition-transform" />
-          <div className="flex justify-between items-start mb-2 relative z-10">
-            <div>
-              <p className="text-xs text-outline uppercase font-bold tracking-wider mb-1 flex items-center gap-1.5">
-                <Icon name="receipt_long" size={16} className="text-primary" /> Total Expense This Month
-              </p>
-              <h2 className="text-4xl font-headline font-black text-on-surface">{formatINR(monthSpent)}</h2>
-            </div>
-            <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-              <Icon name="arrow_forward" size={20} />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-4 pt-3 border-t border-outline-variant/15 text-xs relative z-10">
-            <div>
-              <span className="text-outline">Spent Today: </span>
-              <span className="font-bold text-on-surface">{formatINR(todaySpent)}</span>
-            </div>
-            <div className="w-px h-3 bg-outline-variant/30" />
-            <div>
-              <span className="text-outline">Combined Net Worth: </span>
-              <span className="font-bold text-emerald-400">{formatINR(netWorth)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Life Strategy & Health Diagnostic Scorecard */}
-        <LifeHealthDiagnosticCard
-          routinesCompleted={routinesCompleted}
-          totalRoutines={totalRoutines}
-          todaySpent={todaySpent}
-          monthSpent={monthSpent}
-          streak={streak || 0}
-          pendingCount={pendingItems.length}
-          expiringPerksCount={expiringPerks ? expiringPerks.length : 0}
-        />
-
-        {/* Card 2: Today's Pending Tasks & Events */}
-        <div className="bg-surface-container-lowest rounded-3xl p-5 border border-outline-variant/30 shadow-card space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                <Icon name="checklist" size={18} />
+          {/* Top Hero & Greeting Strip */}
+          <section className="flex flex-col gap-3 pt-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-semibold text-on-surface-variant tracking-wider uppercase">
+                  {dateStr}
+                </span>
+                <h2 className="text-2xl sm:text-3xl font-headline font-bold text-on-surface tracking-tight mt-0.5 truncate">
+                  {getGreeting()}, {userName}
+                </h2>
               </div>
-              <div>
-                <h3 className="font-headline font-bold text-sm text-on-surface">Today's Pending Tasks</h3>
-                <p className="text-[11px] text-outline">{pendingItems.length} items remaining for today</p>
-              </div>
-            </div>
 
-            <button
-              onClick={() => navigate('/schedule')}
-              className="text-xs font-bold text-primary hover:underline flex items-center gap-1"
-            >
-              Full Schedule <Icon name="chevron_right" size={16} />
-            </button>
-          </div>
-
-          <div className="space-y-2.5">
-            {loading ? (
-              <p className="text-xs text-outline text-center py-6 animate-pulse">Loading today's agenda...</p>
-            ) : pendingItems.length === 0 ? (
-              <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center text-emerald-400 space-y-1">
-                <Icon name="task_alt" size={28} className="mx-auto" />
-                <p className="font-bold text-sm">All Clear for Today!</p>
-                <p className="text-xs text-emerald-400/80">Every routine and task for today is completed.</p>
-              </div>
-            ) : (
-              pendingItems.slice(0, 5).map((item) => (
-                <div
-                  key={`${item.itemType}-${item.id}`}
-                  className="bg-surface-container/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 border border-outline-variant/20 hover:bg-surface-container/80 transition-all"
+              {/* Streak Pill & Daily Briefing Action */}
+              <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                <button
+                  onClick={() => setShowBriefingModal(true)}
+                  className="hidden sm:flex items-center gap-1 px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-full text-xs font-bold transition-all shadow-xs"
+                  title="Daily Focus Briefing"
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <button
-                      onClick={() => handleToggleItem(item)}
-                      className="w-5 h-5 rounded-full border-2 border-outline hover:border-primary flex items-center justify-center transition-all flex-shrink-0"
-                    >
-                      <Icon name="check" size={12} className="opacity-0 hover:opacity-100 text-primary" />
-                    </button>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-bold text-xs text-on-surface truncate">{item.title}</p>
-                      <p className="text-[10px] text-outline mt-0.5 flex items-center gap-1">
-                        <Icon name="schedule" size={10} /> {item.time}
-                      </p>
-                    </div>
-                  </div>
+                  <Icon name="center_focus_strong" size={14} />
+                  <span>Briefing</span>
+                </button>
 
-                  <span className={cn('text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0', item.color)}>
-                    {item.tag}
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-tertiary-fixed/40 text-on-tertiary-fixed-variant rounded-full shadow-xs border border-tertiary-fixed/30">
+                  <span className="text-sm leading-none">🔥</span>
+                  <span className="font-mono text-xs font-semibold tracking-tight">
+                    {streak} {streak === 1 ? 'Day' : 'Days'}
                   </span>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              </div>
+            </div>
 
-        {/* Card 3: Notifications & AI Coach Insights */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-headline font-bold uppercase tracking-wider text-outline px-1">
-            Notifications & Daily Insights
-          </h3>
-
-          {/* Perk Expiry Notification Banner */}
-          {expiringPerks && expiringPerks.length > 0 && (
-            <div
-              onClick={() => navigate('/portfolio')}
-              className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex items-center justify-between gap-3 cursor-pointer hover:bg-amber-500/15 transition-all shadow-sm"
+            {/* Safe to Spend Tactical Micro-Bar */}
+            <div 
+              onClick={() => navigate('/expenses')}
+              className="flex items-center justify-between px-4 py-2.5 bg-surface-container-low hover:bg-surface-container rounded-2xl cursor-pointer transition-colors group border border-outline-variant/20 shadow-xs"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-400 flex-shrink-0 animate-pulse">
-                  <Icon name="warning" size={18} />
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className={cn(
+                  "w-2.5 h-2.5 rounded-full shrink-0",
+                  isOnTrack ? "bg-secondary animate-pulse" : "bg-error animate-pulse"
+                )}></span>
+                <div className="flex items-baseline gap-1.5 truncate">
+                  <span className="font-mono text-sm sm:text-base font-bold text-on-surface">
+                    {formatINR(safeToSpendToday)}
+                  </span>
+                  <span className="text-xs text-on-surface-variant truncate">
+                    safe to spend today · {formatINR(todaySpent)} spent
+                  </span>
                 </div>
-                <div>
-                  <h4 className="font-bold text-xs text-amber-400">Expiring Reward Perks</h4>
-                  <p className="text-[11px] text-outline mt-0.5">
-                    {expiringPerks.map(p => `${p.type} (${p.platform}) in ${p.diffDays}d`).join(' • ')}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className={cn(
+                  "px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-tight shrink-0",
+                  isOnTrack 
+                    ? "bg-secondary-container/50 text-on-secondary-container" 
+                    : "bg-error-container/60 text-on-error-container"
+                )}>
+                  {isOnTrack ? 'On Track' : 'Budget Warning'}
+                </span>
+                <Icon name="arrow_forward" size={14} className="text-on-surface-variant group-hover:translate-x-0.5 transition-transform" />
+              </div>
+            </div>
+          </section>
+
+          {/* Quick Action Logger Bar (Quick Add Expense & Hydration) */}
+          <QuickLoggerBar onExpenseLogged={loadCockpitData} />
+
+          {/* Glanceable Momentum Card */}
+          <section className="bg-surface-container-lowest p-4 sm:p-5 rounded-3xl shadow-card border border-outline-variant/25 flex flex-col gap-3 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                  <Icon name="bolt" size={18} />
+                </div>
+                <span className="font-headline text-base sm:text-lg font-bold text-on-surface">
+                  Momentum
+                </span>
+              </div>
+              <span className="font-mono text-xs sm:text-sm font-bold text-primary">
+                {completedCount} of {totalItemsCount} done ({progressPercent}%)
+              </span>
+            </div>
+
+            {/* Animated Progress Track */}
+            <div className="w-full bg-surface-container-highest h-2.5 rounded-full overflow-hidden">
+              <div 
+                className="bg-primary h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            {/* Next Up Item Pill */}
+            <div className="flex items-center justify-between gap-3 pt-1 border-t border-outline-variant/15">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] uppercase tracking-wider text-on-surface-variant font-bold shrink-0 bg-surface-container-high px-1.5 py-0.5 rounded-md">
+                  Next Up
+                </span>
+                {nextUpItem ? (
+                  <>
+                    <span className="font-mono text-xs text-on-surface-variant shrink-0 bg-surface-container px-2 py-0.5 rounded-md">
+                      {nextUpItem.start || nextUpItem.scheduledTime || nextUpItem.time || 'Today'}
+                    </span>
+                    <span className="text-xs sm:text-sm text-on-surface truncate font-medium">
+                      {nextUpItem.title}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-xs text-secondary font-medium truncate">
+                    All set! Everything on the agenda is completed. 🎉
+                  </span>
+                )}
+              </div>
+              <Icon name="arrow_forward" size={16} className="text-on-surface-variant shrink-0" />
+            </div>
+          </section>
+
+          {/* Section 1: Non-Negotiable Daily Habits */}
+          <section className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-headline text-base sm:text-lg font-bold text-on-surface">
+                  Daily Habits
+                </h3>
+                <span className="font-mono text-xs text-on-surface-variant bg-surface-container px-2 py-0.5 rounded-full font-medium">
+                  {habitsCompletedCount}/{routines.length}
+                </span>
+              </div>
+
+              <button 
+                onClick={() => setShowStudioSheet(true)}
+                className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors py-1 px-2.5 rounded-xl font-semibold text-xs hover:bg-surface-container-low"
+              >
+                <Icon name="tune" size={16} />
+                <span>Manage</span>
+              </button>
+            </div>
+
+            {/* Habit Cards Carousel / Responsive Grid */}
+            {routines.length === 0 ? (
+              <div className="p-6 bg-surface-container-lowest rounded-3xl border border-outline-variant/25 text-center flex flex-col items-center justify-center gap-2">
+                <span className="text-3xl">🌱</span>
+                <p className="font-headline font-bold text-sm text-on-surface">No Daily Habits Scheduled</p>
+                <p className="text-xs text-on-surface-variant max-w-xs">
+                  Create daily non-negotiable habits to build momentum and power your day.
+                </p>
+                <button
+                  onClick={() => setShowStudioSheet(true)}
+                  className="mt-2 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-xs"
+                >
+                  Configure Habits in Studio
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                {routines.map((habit) => {
+                  const isDone = habit.completed;
+                  const emoji = getHabitEmoji(habit.title, habit.type || habit.category);
+
+                  return (
+                    <button
+                      key={habit.id}
+                      onClick={() => handleToggleHabit(habit)}
+                      className={cn(
+                        "text-left p-3.5 rounded-2xl bg-surface-container-lowest border shadow-xs flex flex-col justify-between h-28 transition-all active:scale-[0.98] select-none group",
+                        isDone 
+                          ? "border-secondary/20 bg-secondary/5" 
+                          : "border-outline-variant/25 hover:border-primary/40 hover:bg-surface-container-low/50"
+                      )}
+                    >
+                      <div className="flex items-start justify-between w-full">
+                        <span className="text-2xl">{emoji}</span>
+                        <div className={cn(
+                          "w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-2xs",
+                          isDone 
+                            ? "bg-secondary-container text-on-secondary-container" 
+                            : "bg-surface-container-highest text-transparent group-hover:text-outline-variant"
+                        )}>
+                          <Icon name="check" size={16} className={isDone ? "text-on-secondary-container font-bold" : "opacity-0 group-hover:opacity-60"} />
+                        </div>
+                      </div>
+
+                      <div className="min-w-0 w-full">
+                        <p className={cn(
+                          "text-xs sm:text-sm font-semibold truncate transition-all",
+                          isDone ? "text-on-surface/70 line-through" : "text-on-surface"
+                        )}>
+                          {habit.title}
+                        </p>
+                        <span className={cn(
+                          "text-[11px] font-medium tracking-tight block truncate mt-0.5",
+                          isDone ? "text-secondary font-semibold" : "text-on-surface-variant"
+                        )}>
+                          {isDone ? 'Completed' : (habit.start ? `Target: ${habit.start}` : `${habit.duration || 15} mins`)}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          {/* Section 2: Today's Actionable Tasks */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-headline text-base sm:text-lg font-bold text-on-surface">
+                  Action Tasks
+                </h3>
+                <span className="font-mono text-xs text-primary bg-primary-fixed/50 px-2 py-0.5 rounded-full font-bold">
+                  {activeTasks.length} Pending
+                </span>
+              </div>
+              <span className="text-xs text-on-surface-variant font-medium">
+                Priority Sorted
+              </span>
+            </div>
+
+            {/* Smart Task Quick-Add Field */}
+            <form 
+              onSubmit={handleQuickAddTask}
+              className="bg-surface-container-lowest p-3 rounded-2xl shadow-card border border-outline-variant/25 flex flex-col gap-2.5"
+            >
+              <div className="flex items-center gap-2.5 px-1">
+                <Icon name="add_task" size={20} className="text-primary shrink-0" />
+                <input
+                  type="text"
+                  value={newTaskInput}
+                  onChange={(e) => setNewTaskInput(e.target.value)}
+                  placeholder="Add a task for today (Press Enter)..."
+                  className="w-full bg-transparent text-xs sm:text-sm text-on-surface placeholder:text-outline focus:outline-none"
+                />
+              </div>
+
+              {/* Priority Chip Selector & Add Button */}
+              <div className="flex items-center justify-between pt-1 px-1 border-t border-outline-variant/15">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriority('high')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                      selectedPriority === 'high'
+                        ? "bg-error-container/60 text-on-error-container shadow-2xs font-bold"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    )}
+                  >
+                    High
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriority('med')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                      selectedPriority === 'med'
+                        ? "bg-tertiary-fixed/80 text-on-tertiary-fixed-variant shadow-2xs font-bold"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    )}
+                  >
+                    Med
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedPriority('low')}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                      selectedPriority === 'low'
+                        ? "bg-secondary-container/60 text-on-secondary-container shadow-2xs font-bold"
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    )}
+                  >
+                    Low
+                  </button>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!newTaskInput.trim() || isSubmittingTask}
+                  className="px-4 py-1.5 rounded-full bg-primary-container text-on-primary-container text-xs font-bold hover:opacity-95 active:scale-95 transition-all disabled:opacity-40 shadow-xs"
+                >
+                  {isSubmittingTask ? 'Adding...' : 'Add'}
+                </button>
+              </div>
+            </form>
+
+            {/* Active Priority Tasks List */}
+            <div className="flex flex-col gap-2">
+              {loading ? (
+                <div className="p-8 text-center text-xs text-outline animate-pulse">
+                  Syncing tasks...
+                </div>
+              ) : activeTasks.length === 0 ? (
+                <div className="p-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 text-center space-y-1">
+                  <p className="font-headline font-bold text-xs text-secondary">
+                    No Pending Tasks
+                  </p>
+                  <p className="text-[11px] text-on-surface-variant">
+                    You're completely caught up! Add a new task above or relax.
                   </p>
                 </div>
-              </div>
-              <Icon name="chevron_right" size={18} className="text-amber-400" />
-            </div>
-          )}
+              ) : (
+                activeTasks.map((task) => {
+                  const priority = (task.priority || 'Medium').toLowerCase();
+                  const priorityDotClass = 
+                    priority === 'high' ? 'bg-error' :
+                    (priority === 'med' || priority === 'medium') ? 'bg-tertiary-container' :
+                    'bg-secondary';
 
-          {/* AI Daily Coach Insight */}
-          {aiInsight && (
-            <div className="bg-surface-container-lowest rounded-2xl p-4 border border-outline-variant/30 shadow-card flex items-start gap-3">
-              <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
-                <Icon name="auto_awesome" size={18} />
-              </div>
-              <div>
-                <p className="text-[10px] font-extrabold text-primary uppercase tracking-widest mb-0.5">Daily Coach Insight</p>
-                <p className="text-xs text-on-surface leading-relaxed font-medium">"{aiInsight}"</p>
-              </div>
+                  return (
+                    <div
+                      key={task.id}
+                      className="flex items-center justify-between p-3.5 bg-surface-container-lowest rounded-2xl shadow-xs border border-outline-variant/20 hover:border-outline-variant/40 hover:bg-surface-container-low/40 transition-all group"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <button
+                          onClick={() => handleToggleTask(task)}
+                          className="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 text-transparent transition-all group-hover:bg-surface-container-high active:scale-95"
+                          title="Mark complete"
+                        >
+                          <Icon name="check" size={16} className="text-on-surface-variant opacity-0 group-hover:opacity-70" />
+                        </button>
+
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className="text-xs sm:text-sm font-medium text-on-surface truncate">
+                            {task.title}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="flex items-center gap-1 font-mono text-[11px] text-on-surface-variant">
+                              <Icon name="schedule" size={13} />
+                              {task.scheduledTime || task.time || 'Today'}
+                            </span>
+                            <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+                            <span className="px-2 py-0.5 rounded-md bg-surface-container text-[10px] font-semibold text-on-surface-variant">
+                              {task.category || 'Work'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        <span 
+                          className={cn("w-2.5 h-2.5 rounded-full shrink-0", priorityDotClass)} 
+                          title={`${task.priority || 'Medium'} Priority`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
-          )}
+
+            {/* Completed Tasks Accordion */}
+            {completedTasks.length > 0 && (
+              <div className="flex flex-col bg-surface-container-low rounded-2xl overflow-hidden mt-1 border border-outline-variant/20 transition-all">
+                <button
+                  type="button"
+                  onClick={() => setCompletedAccordionOpen(!completedAccordionOpen)}
+                  className="flex items-center justify-between p-3.5 text-on-surface-variant hover:text-on-surface transition-colors w-full text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider">
+                      Completed Today
+                    </span>
+                    <span className="font-mono text-xs bg-surface-container-highest px-2 py-0.5 rounded-full font-bold">
+                      {completedTasks.length}
+                    </span>
+                  </div>
+                  <Icon 
+                    name="expand_more" 
+                    size={20} 
+                    className={cn(
+                      "transition-transform duration-300",
+                      completedAccordionOpen ? "rotate-180" : "rotate-0"
+                    )} 
+                  />
+                </button>
+
+                {completedAccordionOpen && (
+                  <div className="flex flex-col gap-2 px-3 pb-3">
+                    {completedTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className="flex items-center justify-between py-2 px-3 bg-surface-container-lowest/80 rounded-xl border border-outline-variant/15"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <button
+                            onClick={() => handleToggleTask(task)}
+                            className="w-5 h-5 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container shrink-0"
+                            title="Click to unmark"
+                          >
+                            <Icon name="check" size={14} className="font-bold" />
+                          </button>
+                          <span className="text-xs sm:text-sm text-on-surface-variant line-through truncate">
+                            {task.title}
+                          </span>
+                        </div>
+                        <span className="font-mono text-[11px] text-outline shrink-0 ml-2">
+                          {task.scheduledTime || task.time || 'Done'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+
         </div>
+      </main>
 
-      </div>
+      {/* Habit & Task Studio Bottom Sheet */}
+      <HabitTaskStudioSheet
+        isOpen={showStudioSheet}
+        onClose={() => setShowStudioSheet(false)}
+        onDataChanged={loadCockpitData}
+      />
 
-      {/* Daily Executive Briefing Pop-up Modal */}
+      {/* Daily Focus Briefing Modal */}
       <DailyFocusBriefingModal
         isOpen={showBriefingModal}
         onClose={handleCloseBriefing}
-        pendingItems={pendingItems}
+        pendingItems={activeTasks}
         monthSpent={monthSpent}
         monthlyBudget={monthlyBudget}
-        streak={streak || 0}
+        streak={streak}
       />
     </div>
   );
 }
-
