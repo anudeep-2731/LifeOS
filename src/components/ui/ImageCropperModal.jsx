@@ -149,7 +149,7 @@ export default function ImageCropperModal({
   if (!isOpen || !imageSrc) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn select-none">
+    <div className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 animate-fadeIn select-none">
       <div className="w-full max-w-sm sm:max-w-md bg-surface-container-lowest rounded-3xl p-4 sm:p-5 shadow-2xl border border-white/10 flex flex-col gap-4">
         {/* Header */}
         <div className="flex items-center justify-between">

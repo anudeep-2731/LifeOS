@@ -75,7 +75,7 @@ function CenterCirclesItem() {
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pb-2 pt-1.5 bg-[#f8f9ff]/95 backdrop-blur-xl z-50 rounded-t-[2rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20 max-w-xl mx-auto md:max-w-2xl">
+    <nav className="fixed bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pb-2 pt-1.5 bg-[#f8f9ff]/95 backdrop-blur-xl z-40 rounded-t-[2rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20 max-w-xl mx-auto md:max-w-2xl">
       {/* 1. Today */}
       <NavTab to="/dashboard" icon="today" label="Today" />
 

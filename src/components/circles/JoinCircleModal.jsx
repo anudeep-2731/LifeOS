@@ -29,7 +29,7 @@ export default function JoinCircleModal({ isOpen, onClose, onJoined }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-3xl p-6 w-full max-w-md shadow-xl animate-in fade-in zoom-in duration-200">
         <div className="flex justify-between items-center mb-5">
           <div className="flex items-center gap-3">

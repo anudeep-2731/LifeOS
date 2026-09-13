@@ -102,8 +102,8 @@ export default function PostComposer({ isOpen, onClose, circleId, circleName = '
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-        <div className="w-full sm:max-w-lg bg-surface-container-lowest rounded-t-[32px] sm:rounded-[32px] p-5 sm:p-6 shadow-2xl border border-outline-variant/25 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
+      <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+        <div className="w-full sm:max-w-lg bg-surface-container-lowest rounded-t-[32px] sm:rounded-[32px] p-5 sm:p-6 pb-10 sm:pb-6 shadow-2xl border border-outline-variant/25 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
           {/* Sheet Handle for mobile */}
           <div className="w-10 h-1 rounded-full bg-outline-variant mx-auto sm:hidden -mt-1 mb-1"></div>
 
@@ -134,8 +134,8 @@ export default function PostComposer({ isOpen, onClose, circleId, circleName = '
                   : 'text-on-surface-variant hover:text-on-surface'
               }`}
             >
-              <span>📸</span>
-              <span>Photo / Proof</span>
+              <Icon name="photo_camera" size={16} />
+              <span>Camera Proof</span>
             </button>
             <button
               type="button"
@@ -209,10 +209,10 @@ export default function PostComposer({ isOpen, onClose, circleId, circleName = '
                       <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="p-2 rounded-full bg-black/60 backdrop-blur-xs text-white text-xs hover:bg-black/80 transition-colors"
-                        title="Change photo"
+                        className="p-2 rounded-full bg-black/60 backdrop-blur-xs text-white text-xs hover:bg-black/80 transition-colors flex items-center gap-1"
+                        title="Retake live photo"
                       >
-                        <Icon name="edit" size={16} />
+                        <Icon name="photo_camera" size={16} />
                       </button>
                       <button
                         type="button"
@@ -227,19 +227,26 @@ export default function PostComposer({ isOpen, onClose, circleId, circleName = '
                 ) : (
                   <div
                     onClick={() => fileInputRef.current?.click()}
-                    className="p-6 border-2 border-dashed border-outline-variant/30 rounded-2xl hover:border-primary/50 hover:bg-primary/5 transition-all flex flex-col items-center justify-center gap-2 cursor-pointer text-center"
+                    className="p-6 border-2 border-dashed border-primary/30 bg-primary/5 rounded-2xl hover:border-primary/60 hover:bg-primary/10 transition-all flex flex-col items-center justify-center gap-2.5 cursor-pointer text-center group active:scale-[0.99]"
                   >
-                    <div className="w-12 h-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center text-2xl">
-                      📸
+                    <div className="w-14 h-14 rounded-2xl bg-primary text-white flex items-center justify-center text-2xl shadow-sm group-hover:scale-105 transition-transform">
+                      <Icon name="photo_camera" size={28} />
                     </div>
                     <div>
-                      <p className="font-headline font-bold text-xs sm:text-sm text-on-surface">
-                        Choose or snap a photo
-                      </p>
-                      <p className="text-[11px] text-outline mt-0.5">
-                        You can crop and frame your photo before posting
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-error animate-ping"></span>
+                        <p className="font-headline font-bold text-xs sm:text-sm text-on-surface">
+                          Snap Live Camera Proof
+                        </p>
+                      </div>
+                      <p className="text-[11px] text-outline mt-1 max-w-xs">
+                        Camera only — snap live proof in the moment. Gallery uploads disabled.
                       </p>
                     </div>
+                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-[10px] font-bold tracking-wider uppercase border border-primary/20 flex items-center gap-1">
+                      <Icon name="camera" size={13} />
+                      <span>Open Camera</span>
+                    </span>
                   </div>
                 )}
 
@@ -247,6 +254,7 @@ export default function PostComposer({ isOpen, onClose, circleId, circleName = '
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  capture="environment"
                   onChange={handleFileSelect}
                   className="hidden"
                 />

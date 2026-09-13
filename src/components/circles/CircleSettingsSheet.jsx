@@ -54,8 +54,8 @@ export default function CircleSettingsSheet({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl p-6 w-full max-w-md shadow-xl animate-in slide-in-from-bottom duration-200">
+    <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-surface-container-lowest border border-outline-variant/30 rounded-t-3xl sm:rounded-3xl p-6 pb-10 sm:pb-6 w-full max-w-md shadow-2xl max-h-[88vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">

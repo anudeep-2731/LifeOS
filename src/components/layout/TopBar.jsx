@@ -25,7 +25,7 @@ export default function TopBar() {
 
   return (
     <>
-      <header className="fixed top-0 w-full z-50 bg-[#f8f9ff]/90 backdrop-blur-xl flex justify-between items-center px-4 sm:px-6 h-16 border-b border-outline-variant/20 shadow-xs">
+      <header className="fixed top-0 w-full z-40 bg-[#f8f9ff]/90 backdrop-blur-xl flex justify-between items-center px-4 sm:px-6 h-16 border-b border-outline-variant/20 shadow-xs">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setDrawerOpen(true)}
