@@ -133,11 +133,24 @@ export default function CirclesTab() {
     }
   };
 
-  // Calculate squad momentum & active counts
-  const activeCount = members.length;
+  // Calculate dynamic squad metrics
+  const totalMembersCount = members.length;
+  const activeTodayCount = members.filter(m => (snapshots[m.user_id]?.routine_score || 0) > 0).length;
   const totalRoutinesCompleted = Object.values(snapshots).reduce(
-    (acc, s) => acc + (s?.routines_completed || 0), 0
+    (acc, s) => acc + (s?.routine_score || 0) > 0 ? 1 : 0, 0
   );
+
+  // Current user metrics
+  const mySnapshot = snapshots[currentUserId];
+  const myRoutineScore = mySnapshot?.routine_score ?? 0;
+  const myTaskScore = mySnapshot?.task_score ?? 0;
+  const myFinStatus = mySnapshot?.financial_status || 'On Track';
+
+  // Squad average pace
+  const snapshotValues = Object.values(snapshots);
+  const squadAvgPace = totalMembersCount > 0 && snapshotValues.length > 0
+    ? Math.round(snapshotValues.reduce((acc, s) => acc + (s?.routine_score || 0), 0) / totalMembersCount)
+    : 0;
 
   return (
     <div className="flex flex-col w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-28 pt-2 select-none gap-6">
@@ -263,7 +276,7 @@ export default function CirclesTab() {
                 <div className="flex items-center gap-1.5">
                   <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/30 text-on-surface font-label text-[10px] font-semibold">
                     <Icon name="group" size={12} className="text-primary" />
-                    <span>{activeCount}/8 Active</span>
+                    <span>{activeTodayCount}/{totalMembersCount} Active</span>
                   </div>
                   <button
                     onClick={() => setShowSquadDropdown(prev => !prev)}
@@ -280,7 +293,7 @@ export default function CirclesTab() {
                   <div className="flex flex-col">
                     <span className="font-label text-[10px] text-on-surface-variant font-medium">Momentum</span>
                     <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-headline text-sm font-bold text-on-surface">🔥 {totalRoutinesCompleted > 0 ? totalRoutinesCompleted : '4'} Streaks</span>
+                      <span className="font-headline text-sm font-bold text-on-surface">🔥 {activeTodayCount} Streaks</span>
                     </div>
                   </div>
                   <span className="px-1.5 py-0.5 rounded-full bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label text-[10px] font-semibold">
@@ -292,21 +305,21 @@ export default function CirclesTab() {
                   <div className="flex flex-col">
                     <span className="font-label text-[10px] text-on-surface-variant font-medium">Your Pace</span>
                     <div className="flex items-baseline gap-1 mt-0.5">
-                      <span className="font-headline text-sm font-bold text-on-surface">85%</span>
-                      <span className="font-body text-[10px] text-secondary font-semibold">On Track</span>
+                      <span className="font-headline text-sm font-bold text-on-surface">{myRoutineScore}%</span>
+                      <span className="font-body text-[10px] text-secondary font-semibold">{myFinStatus}</span>
                     </div>
                   </div>
-                  <span className="font-data text-[10px] text-primary font-bold">3/4 Done</span>
+                  <span className="font-data text-[10px] text-primary font-bold">{myRoutineScore > 0 ? `${myRoutineScore}% Done` : '0% Done'}</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-1">
                 <div className="w-full bg-surface-container-highest/80 rounded-full h-1.5 overflow-hidden p-0.5">
-                  <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 shadow-xs" style={{ width: '85%' }}></div>
+                  <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 shadow-xs" style={{ width: `${Math.max(5, squadAvgPace)}%` }}></div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-on-surface-variant">
-                  <span className="font-body">Squad Daily Target</span>
-                  <span className="font-data font-semibold text-on-surface">Target: 100% by 8 PM</span>
+                  <span className="font-body">Squad Daily Pace</span>
+                  <span className="font-data font-semibold text-on-surface">{squadAvgPace}% Completed</span>
                 </div>
               </div>
             </div>
@@ -321,7 +334,7 @@ export default function CirclesTab() {
             ) : (
               members.map((mem) => {
                 const snap = snapshots[mem.user_id];
-                const isDone = (snap?.routines_completed || 0) > 0;
+                const isDone = (snap?.routines_completed || 0) > 0 || (snap?.routine_score || 0) > 0;
                 const displayName = mem.display_name || mem.user_name || 'Member';
                 const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
 
@@ -370,7 +383,7 @@ export default function CirclesTab() {
               ) : (
                 members.map((mem) => {
                   const snap = snapshots[mem.user_id];
-                  const isDone = (snap?.routines_completed || 0) > 0;
+                  const isDone = (snap?.routines_completed || 0) > 0 || (snap?.routine_score || 0) > 0;
                   const displayName = mem.display_name || mem.user_name || 'Member';
                   const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
 
@@ -486,6 +499,7 @@ export default function CirclesTab() {
                 <CirclePostCard
                   key={post.id}
                   post={post}
+                  circleName={selectedCircle?.name}
                   currentUserId={currentUserId}
                   onPostUpdated={() => loadData()}
                 />

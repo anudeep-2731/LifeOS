@@ -72,12 +72,16 @@ export default function MemberScoreCard({ member, snapshot, isCurrentUser, onCli
     >
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-extrabold text-xs flex items-center justify-center shadow-xs">
-            {member.user_name?.charAt(0).toUpperCase() || 'U'}
+          <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-primary to-primary-container text-white font-extrabold text-xs flex items-center justify-center shadow-xs flex-shrink-0">
+            {member.avatar_url ? (
+              <img src={member.avatar_url} alt={member.display_name || member.user_name} className="w-full h-full object-cover" />
+            ) : (
+              (member.display_name || member.user_name || 'U').charAt(0).toUpperCase()
+            )}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <h4 className="text-xs font-headline font-bold text-on-surface">{member.user_name}</h4>
+              <h4 className="text-xs font-headline font-bold text-on-surface">{member.display_name || member.user_name}</h4>
               {isCurrentUser && (
                 <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-extrabold">You</span>
               )}
