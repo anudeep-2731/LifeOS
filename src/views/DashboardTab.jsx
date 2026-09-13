@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import QuickLoggerBar from '../components/ui/QuickLoggerBar';
-import DailyFocusBriefingModal from '../components/dashboard/DailyFocusBriefingModal';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
 import { 
   fetchCloudExpenses, 
@@ -80,9 +79,6 @@ export default function DashboardTab() {
   // Completed Accordion
   const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false);
 
-  // Modals
-  const [showBriefingModal, setShowBriefingModal] = useState(false);
-
   // Formatted Date
   const dateStr = useMemo(() => {
     return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -140,13 +136,6 @@ export default function DashboardTab() {
 
       // Auto-publish circle snapshot
       publishDailySnapshot(today).catch(console.error);
-
-      // Daily Briefing modal check
-      const briefingKey = `briefing_seen_${today}`;
-      const briefingSeen = await db.settings.get(briefingKey);
-      if (!briefingSeen?.value) {
-        setShowBriefingModal(true);
-      }
     } catch (err) {
       console.error('Error loading cockpit data:', err);
     } finally {
@@ -271,11 +260,6 @@ export default function DashboardTab() {
     }
   };
 
-  const handleCloseBriefing = async () => {
-    await db.settings.put({ key: `briefing_seen_${today}`, value: true });
-    setShowBriefingModal(false);
-  };
-
   return (
     <div className="w-full min-h-screen bg-surface font-body text-on-surface antialiased flex flex-col pb-28">
       <main className="flex flex-col relative w-full max-w-4xl mx-auto px-4 sm:px-6 transition-all duration-300">
@@ -293,17 +277,8 @@ export default function DashboardTab() {
                 </h2>
               </div>
 
-              {/* Streak Pill & Daily Briefing Action */}
+              {/* Streak Pill */}
               <div className="flex items-center gap-2 shrink-0 pt-0.5">
-                <button
-                  onClick={() => setShowBriefingModal(true)}
-                  className="hidden sm:flex items-center gap-1 px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-full text-xs font-bold transition-all shadow-xs"
-                  title="Daily Focus Briefing"
-                >
-                  <Icon name="center_focus_strong" size={14} />
-                  <span>Briefing</span>
-                </button>
-
                 <div className="flex items-center gap-1.5 px-3 py-1 bg-tertiary-fixed/40 text-on-tertiary-fixed-variant rounded-full shadow-xs border border-tertiary-fixed/30">
                   <span className="text-sm leading-none">🔥</span>
                   <span className="font-mono text-xs font-semibold tracking-tight">
@@ -795,16 +770,6 @@ export default function DashboardTab() {
 
         </div>
       </main>
-
-      {/* Daily Focus Briefing Modal */}
-      <DailyFocusBriefingModal
-        isOpen={showBriefingModal}
-        onClose={handleCloseBriefing}
-        pendingItems={activeTasks}
-        monthSpent={monthSpent}
-        monthlyBudget={monthlyBudget}
-        streak={streak}
-      />
     </div>
   );
 }
