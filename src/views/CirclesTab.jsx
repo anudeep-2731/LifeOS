@@ -140,20 +140,20 @@ export default function CirclesTab() {
   );
 
   return (
-    <div className="flex flex-col w-full px-4 pb-28 pt-2 select-none max-w-lg mx-auto gap-4">
+    <div className="flex flex-col w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-28 pt-2 select-none gap-6">
       {/* 1. TOP HEADER BAR WITH SQUAD SELECTOR DROPDOWN */}
-      <header className="flex items-center justify-between pt-1">
+      <header className="flex items-center justify-between pt-1 border-b border-outline-variant/10 pb-3">
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowSquadDropdown(prev => !prev)}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 text-on-surface font-headline text-sm font-bold tracking-tight transition-all active:scale-95 shadow-xs"
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 text-on-surface font-headline text-base sm:text-lg font-bold tracking-tight transition-all active:scale-95 shadow-xs"
           >
-            <span className="relative flex h-2 w-2">
+            <span className="relative flex h-2.5 w-2.5">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-secondary"></span>
             </span>
             <span>{selectedCircle?.name || 'Select Squad'}</span>
-            <Icon name="keyboard_arrow_down" size={18} className={`text-on-surface-variant transition-transform ${showSquadDropdown ? 'rotate-180' : ''}`} />
+            <Icon name="keyboard_arrow_down" size={20} className={`text-on-surface-variant transition-transform ${showSquadDropdown ? 'rotate-180' : ''}`} />
           </button>
 
           {/* Squad Switcher Dropdown Menu */}
@@ -163,13 +163,13 @@ export default function CirclesTab() {
                 initial={{ opacity: 0, scale: 0.95, y: 4 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 4 }}
-                className="absolute left-0 top-12 z-50 w-64 rounded-2xl bg-surface-container-lowest shadow-2xl border border-outline-variant/30 p-2 space-y-1"
+                className="absolute left-0 top-14 z-50 w-72 rounded-2xl bg-surface-container-lowest shadow-2xl border border-outline-variant/30 p-2.5 space-y-1"
               >
                 <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
                   Your Squads ({circles.length})
                 </div>
 
-                <div className="max-h-48 overflow-y-auto space-y-0.5 py-1">
+                <div className="max-h-56 overflow-y-auto space-y-0.5 py-1">
                   {circles.length === 0 ? (
                     <div className="px-3 py-2 text-xs text-on-surface-variant italic">
                       No squads joined yet
@@ -187,8 +187,8 @@ export default function CirclesTab() {
                               : 'text-on-surface hover:bg-surface-container-low'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                               isSelected ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'
                             }`}>
                               {c.name?.charAt(0).toUpperCase() || 'S'}
@@ -202,17 +202,17 @@ export default function CirclesTab() {
                   )}
                 </div>
 
-                <div className="pt-1 border-t border-outline-variant/15 grid grid-cols-2 gap-1">
+                <div className="pt-1.5 border-t border-outline-variant/15 grid grid-cols-2 gap-1.5">
                   <button
                     onClick={() => { setShowSquadDropdown(false); setShowCreateModal(true); }}
-                    className="w-full px-2.5 py-2 text-center text-xs font-bold text-primary hover:bg-primary/10 rounded-xl flex items-center justify-center gap-1"
+                    className="w-full px-3 py-2 text-center text-xs font-bold text-primary hover:bg-primary/10 rounded-xl flex items-center justify-center gap-1.5"
                   >
                     <Icon name="add" size={14} />
                     <span>Create</span>
                   </button>
                   <button
                     onClick={() => { setShowSquadDropdown(false); setShowJoinModal(true); }}
-                    className="w-full px-2.5 py-2 text-center text-xs font-bold text-secondary hover:bg-secondary/10 rounded-xl flex items-center justify-center gap-1"
+                    className="w-full px-3 py-2 text-center text-xs font-bold text-secondary hover:bg-secondary/10 rounded-xl flex items-center justify-center gap-1.5"
                   >
                     <Icon name="group_add" size={14} />
                     <span>Join</span>
@@ -223,7 +223,7 @@ export default function CirclesTab() {
           </AnimatePresence>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={() => setShowSettingsSheet(true)}
             className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
@@ -233,175 +233,267 @@ export default function CirclesTab() {
           </button>
           <button
             onClick={handleToggleComposer}
-            className="flex items-center gap-1 px-3.5 py-1.5 rounded-full bg-primary text-on-primary font-label text-xs font-bold shadow-sm active:scale-95 transition-transform"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-on-primary font-label text-xs sm:text-sm font-bold shadow-sm active:scale-95 transition-transform"
           >
-            <Icon name={showComposer ? "close" : "add"} size={16} />
+            <Icon name={showComposer ? "close" : "add"} size={18} />
             <span>{showComposer ? "Cancel" : "Post"}</span>
           </button>
         </div>
       </header>
 
-      {/* 2. CIRCLE PULSE BAR (Gradient Border Card) */}
-      <div className="w-full rounded-2xl p-[1.5px] bg-gradient-to-r from-primary via-purple-500 to-secondary shadow-sm overflow-hidden">
-        <div className="bg-surface-container-lowest/95 backdrop-blur-md rounded-[15px] flex flex-col p-3 gap-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+      {/* RESPONSIVE LAYOUT GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        {/* LEFT COLUMN: SQUAD PULSE, MEMBERS ROSTER, LEADERBOARD */}
+        <div className="lg:col-span-4 flex flex-col gap-4 lg:sticky lg:top-20">
+          
+          {/* 2. CIRCLE PULSE BAR (Gradient Border Card) */}
+          <div className="w-full rounded-2xl p-[1.5px] bg-gradient-to-r from-primary via-purple-500 to-secondary shadow-sm overflow-hidden">
+            <div className="bg-surface-container-lowest/95 backdrop-blur-md rounded-[15px] flex flex-col p-3.5 gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+                  </span>
+                  <span className="font-headline text-xs font-bold text-on-surface">Squad Pulse</span>
+                  <span className="text-[10px] font-label text-on-surface-variant">· {selectedCircle?.name || 'Squad'}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/30 text-on-surface font-label text-[10px] font-semibold">
+                    <Icon name="group" size={12} className="text-primary" />
+                    <span>{activeCount}/8 Active</span>
+                  </div>
+                  <button
+                    onClick={() => setShowSquadDropdown(prev => !prev)}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label text-[10px] font-semibold hover:bg-primary-fixed/80 transition-colors active:scale-95"
+                  >
+                    <Icon name="swap_horiz" size={12} />
+                    <span>Switch</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center justify-between px-2.5 py-2 rounded-lg bg-surface-container-low/60 border border-outline-variant/20">
+                  <div className="flex flex-col">
+                    <span className="font-label text-[10px] text-on-surface-variant font-medium">Momentum</span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="font-headline text-sm font-bold text-on-surface">🔥 {totalRoutinesCompleted > 0 ? totalRoutinesCompleted : '4'} Streaks</span>
+                    </div>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded-full bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label text-[10px] font-semibold">
+                    Syncing
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between px-2.5 py-2 rounded-lg bg-surface-container-low/60 border border-outline-variant/20">
+                  <div className="flex flex-col">
+                    <span className="font-label text-[10px] text-on-surface-variant font-medium">Your Pace</span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="font-headline text-sm font-bold text-on-surface">85%</span>
+                      <span className="font-body text-[10px] text-secondary font-semibold">On Track</span>
+                    </div>
+                  </div>
+                  <span className="font-data text-[10px] text-primary font-bold">3/4 Done</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <div className="w-full bg-surface-container-highest/80 rounded-full h-1.5 overflow-hidden p-0.5">
+                  <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 shadow-xs" style={{ width: '85%' }}></div>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-on-surface-variant">
+                  <span className="font-body">Squad Daily Target</span>
+                  <span className="font-data font-semibold text-on-surface">Target: 100% by 8 PM</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. MEMBER AVATARS STORY ROW (Mobile: Horizontal Bar, Desktop: Sleek Roster) */}
+          <div className="lg:hidden w-full overflow-x-auto scrollbar-none flex items-center gap-3.5 py-1">
+            {members.length === 0 ? (
+              <div className="text-xs text-on-surface-variant italic px-1 py-2">
+                No members in this circle yet
+              </div>
+            ) : (
+              members.map((mem) => {
+                const snap = snapshots[mem.user_id];
+                const isDone = (snap?.routines_completed || 0) > 0;
+                const displayName = mem.display_name || mem.user_name || 'Member';
+                const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
+
+                return (
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    key={mem.user_id || mem.id}
+                    onClick={() => setSelectedMember(mem)}
+                    className="flex flex-col items-center gap-1.5 flex-shrink-0 group focus:outline-none"
+                    title={`View ${displayName}'s scorecard`}
+                  >
+                    <div className={`w-[60px] h-[60px] rounded-full p-[2.5px] flex items-center justify-center transition-transform active:scale-95 ${
+                      isDone ? 'bg-secondary' : 'bg-primary-container'
+                    }`}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner overflow-hidden">
+                        {avatar ? (
+                          <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
+                        ) : (
+                          displayName[0].toUpperCase()
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-label text-xs text-on-surface max-w-[68px] truncate text-center font-medium">
+                      {displayName}
+                    </span>
+                  </motion.button>
+                );
+              })
+            )}
+          </div>
+
+          {/* DESKTOP MEMBER ROSTER */}
+          <div className="hidden lg:flex flex-col gap-2.5 bg-surface-container-lowest/80 p-4 rounded-2xl border border-outline-variant/20 shadow-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+              <span className="font-headline text-xs font-bold text-on-surface uppercase tracking-wider">
+                Squad Members ({members.length})
               </span>
-              <span className="font-headline text-xs font-bold text-on-surface">Squad Pulse</span>
-              <span className="text-[10px] font-label text-on-surface-variant">· {selectedCircle?.name || 'Squad'}</span>
+              <span className="font-label text-[10px] text-on-surface-variant">Tap to view scorecard</span>
             </div>
 
-            <div className="flex items-center gap-1.5">
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/30 text-on-surface font-label text-[10px] font-semibold">
-                <Icon name="group" size={12} className="text-primary" />
-                <span>{activeCount}/8 Active</span>
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+              {members.length === 0 ? (
+                <div className="text-xs text-on-surface-variant italic py-2">
+                  No members in this circle yet
+                </div>
+              ) : (
+                members.map((mem) => {
+                  const snap = snapshots[mem.user_id];
+                  const isDone = (snap?.routines_completed || 0) > 0;
+                  const displayName = mem.display_name || mem.user_name || 'Member';
+                  const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
+
+                  return (
+                    <button
+                      key={mem.user_id || mem.id}
+                      onClick={() => setSelectedMember(mem)}
+                      className="flex items-center justify-between p-2 rounded-xl hover:bg-surface-container-low transition-colors group text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 rounded-full p-[2px] flex items-center justify-center flex-shrink-0 ${
+                          isDone ? 'bg-secondary' : 'bg-primary-container'
+                        }`}>
+                          <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border border-white flex items-center justify-center text-primary font-headline font-bold text-sm shadow-inner">
+                            {avatar ? (
+                              <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
+                            ) : (
+                              displayName[0].toUpperCase()
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-headline text-xs font-bold text-on-surface truncate group-hover:text-primary transition-colors">
+                            {displayName}
+                          </span>
+                          <span className="font-label text-[10px] text-on-surface-variant">
+                            {isDone ? '🟢 Routine Completed' : '🔵 In Progress'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Icon name="chevron_right" size={16} className="text-outline group-hover:text-primary transition-colors" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* 4. ACTION BANNER: SQUAD SCORECARDS */}
+          <button
+            onClick={() => setShowScorecardsModal(true)}
+            className="w-full h-12 rounded-2xl bg-secondary-container text-on-secondary-container font-headline text-xs font-bold flex items-center justify-center gap-2 shadow-xs active:scale-[0.98] hover:bg-secondary-container/80 transition-all"
+          >
+            <Icon name="emoji_events" size={18} filled />
+            <span>🏆 Squad Scorecards · Weekly Leaderboard</span>
+          </button>
+        </div>
+
+        {/* RIGHT COLUMN: POST COMPOSER & SOCIAL FEED */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+
+          {/* DESKTOP QUICK POST PROMPT BUTTON (WHEN COMPOSER IS HIDDEN) */}
+          {!showComposer && (
+            <div
+              onClick={handleToggleComposer}
+              className="bg-surface-container-lowest hover:bg-surface-container-low transition-colors p-3.5 rounded-2xl border border-outline-variant/20 shadow-xs flex items-center gap-3 cursor-pointer group"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0 overflow-hidden">
+                {userAvatarUrl ? (
+                  <img src={userAvatarUrl} alt="You" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  currentUserName?.[0]?.toUpperCase() || 'U'
+                )}
               </div>
-              <button
-                onClick={() => setShowSquadDropdown(prev => !prev)}
-                className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label text-[10px] font-semibold hover:bg-primary-fixed/80 transition-colors active:scale-95"
-              >
-                <Icon name="swap_horiz" size={12} />
-                <span>Switch</span>
+              <div className="flex-1 text-xs text-on-surface-variant font-medium">
+                Share an update or proof of routine with {selectedCircle?.name || 'your squad'}...
+              </div>
+              <button className="px-3.5 py-1.5 bg-primary text-on-primary rounded-full text-xs font-bold font-label shadow-xs group-hover:scale-105 transition-transform">
+                + Post
               </button>
             </div>
-          </div>
+          )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-container-low/60 border border-outline-variant/20">
-              <div className="flex flex-col">
-                <span className="font-label text-[10px] text-on-surface-variant font-medium">Momentum</span>
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="font-headline text-sm font-bold text-on-surface">🔥 {totalRoutinesCompleted > 0 ? totalRoutinesCompleted : '4'} Streaks</span>
-                </div>
+          {/* 5. POST COMPOSER CARD (Visible when showComposer is true) */}
+          <AnimatePresence>
+            {showComposer && selectedCircle && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -10 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -10 }}
+                className="overflow-hidden"
+              >
+                <PostComposer
+                  circleId={selectedCircle.id}
+                  onPostCreated={() => {
+                    setShowComposer(false);
+                    loadData();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 6. SOCIAL FEED */}
+          <div className="flex flex-col gap-4">
+            {posts.length === 0 ? (
+              <div className="p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-xs flex flex-col items-center justify-center">
+                <Icon name="campaign" size={36} className="text-primary opacity-60 mb-2" />
+                <p className="font-headline font-bold text-base text-on-surface">No updates yet today</p>
+                <p className="font-body text-xs text-on-surface-variant mt-1 max-w-sm leading-relaxed">
+                  Be the first to share your progress or post a workout proof to motivate your squad!
+                </p>
+                <button
+                  onClick={handleToggleComposer}
+                  className="mt-4 px-5 py-2.5 bg-primary text-white rounded-full font-label text-xs font-bold shadow-sm active:scale-95 hover:bg-primary/90 transition-transform"
+                >
+                  Post Progress
+                </button>
               </div>
-              <span className="px-1.5 py-0.5 rounded-full bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label text-[10px] font-semibold">
-                Syncing
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-container-low/60 border border-outline-variant/20">
-              <div className="flex flex-col">
-                <span className="font-label text-[10px] text-on-surface-variant font-medium">Your Pace</span>
-                <div className="flex items-baseline gap-1 mt-0.5">
-                  <span className="font-headline text-sm font-bold text-on-surface">85%</span>
-                  <span className="font-body text-[10px] text-secondary font-semibold">On Track</span>
-                </div>
-              </div>
-              <span className="font-data text-[10px] text-primary font-bold">3/4 Done</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <div className="w-full bg-surface-container-highest/80 rounded-full h-1.5 overflow-hidden p-0.5">
-              <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 shadow-xs" style={{ width: '85%' }}></div>
-            </div>
-            <div className="flex items-center justify-between text-[10px] text-on-surface-variant">
-              <span className="font-body">Squad Daily Target</span>
-              <span className="font-data font-semibold text-on-surface">Target: 100% by 8 PM</span>
-            </div>
+            ) : (
+              posts.map((post) => (
+                <CirclePostCard
+                  key={post.id}
+                  post={post}
+                  currentUserId={currentUserId}
+                  onPostUpdated={() => loadData()}
+                />
+              ))
+            )}
           </div>
         </div>
-      </div>
 
-      {/* 3. MEMBER AVATARS STORY ROW (Strictly Members Pics) */}
-      <div className="w-full overflow-x-auto scrollbar-none flex items-center gap-3.5 py-1">
-        {members.length === 0 ? (
-          <div className="text-xs text-on-surface-variant italic px-1 py-2">
-            No members in this circle yet
-          </div>
-        ) : (
-          members.map((mem) => {
-            const snap = snapshots[mem.user_id];
-            const isDone = (snap?.routines_completed || 0) > 0;
-            const displayName = mem.display_name || mem.user_name || 'Member';
-            const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
-
-            return (
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                key={mem.user_id || mem.id}
-                onClick={() => setSelectedMember(mem)}
-                className="flex flex-col items-center gap-1.5 flex-shrink-0 group focus:outline-none"
-                title={`View ${displayName}'s scorecard`}
-              >
-                <div className={`w-[60px] h-[60px] rounded-full p-[2.5px] flex items-center justify-center transition-transform active:scale-95 ${
-                  isDone ? 'bg-secondary' : 'bg-primary-container'
-                }`}>
-                  <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner overflow-hidden">
-                    {avatar ? (
-                      <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
-                    ) : (
-                      displayName[0].toUpperCase()
-                    )}
-                  </div>
-                </div>
-                <span className="font-label text-xs text-on-surface max-w-[68px] truncate text-center font-medium">
-                  {displayName}
-                </span>
-              </motion.button>
-            );
-          })
-        )}
-      </div>
-
-      {/* 4. ACTION BANNER: SQUAD SCORECARDS */}
-      <button
-        onClick={() => setShowScorecardsModal(true)}
-        className="w-full h-12 rounded-full bg-secondary-container text-on-secondary-container font-headline text-xs font-bold flex items-center justify-center gap-2 shadow-xs active:scale-[0.98] transition-transform"
-      >
-        <Icon name="emoji_events" size={18} filled />
-        <span>🏆 Squad Scorecards · Weekly Leaderboard</span>
-      </button>
-
-      {/* 5. POST COMPOSER CARD (Visible when showComposer is true) */}
-      <AnimatePresence>
-        {showComposer && selectedCircle && (
-          <motion.div
-            initial={{ opacity: 0, height: 0, y: -10 }}
-            animate={{ opacity: 1, height: 'auto', y: 0 }}
-            exit={{ opacity: 0, height: 0, y: -10 }}
-            className="overflow-hidden"
-          >
-            <PostComposer
-              circleId={selectedCircle.id}
-              onPostCreated={() => {
-                setShowComposer(false);
-                loadData();
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* 6. SOCIAL FEED */}
-      <div className="flex flex-col gap-4">
-        {posts.length === 0 ? (
-          <div className="p-6 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-xs">
-            <Icon name="campaign" size={32} className="text-primary opacity-60 mx-auto mb-2" />
-            <p className="font-headline font-bold text-sm text-on-surface">No updates yet today</p>
-            <p className="font-body text-xs text-on-surface-variant mt-1 leading-relaxed">
-              Be the first to share your progress or post a workout proof to motivate your squad!
-            </p>
-            <button
-              onClick={handleToggleComposer}
-              className="mt-3 px-4 py-2 bg-primary text-white rounded-full font-label text-xs font-bold shadow-sm active:scale-95 transition-transform"
-            >
-              Post Progress
-            </button>
-          </div>
-        ) : (
-          posts.map((post) => (
-            <CirclePostCard
-              key={post.id}
-              post={post}
-              currentUserId={currentUserId}
-              onPostUpdated={() => loadData()}
-            />
-          ))
-        )}
       </div>
 
       {/* Modals & Sheets */}
