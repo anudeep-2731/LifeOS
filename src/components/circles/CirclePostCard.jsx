@@ -29,12 +29,39 @@ export default function CirclePostCard({ post, currentUserId, onPostUpdated }) {
   const [errorMessage, setErrorMessage] = useState(null);
   const [burst, setBurst] = useState(null); // { emoji, x, y }
   const [localReactions, setLocalReactions] = useState(post.circle_reactions || []);
+  const [isLiked, setIsLiked] = useState(false);
+
+  // Local comments state
+  const [comments, setComments] = useState(post.comments || [
+    { id: 1, user: 'elena_v', text: 'Crushing the squad weekly goals! 🔥' }
+  ]);
+  const [newComment, setNewComment] = useState('');
+  const [showComments, setShowComments] = useState(false);
 
   const { ref, inView } = useInView({ threshold: 0.1, triggerOnce: true });
 
   const isOwner = post.user_id === currentUserId;
-  const isAdvice = post.post_type === 'squad_advice' || post.advice_category;
-  const isTaskCompletion = post.post_type === 'task_completion' || post.task_tag;
+
+  // Extract category or tags if formatted with [Advice:Category] or [Completed:Tag]
+  let displayCaption = post.caption || '';
+  let categoryTag = null;
+
+  if (displayCaption.startsWith('[Advice:')) {
+    const endIdx = displayCaption.indexOf(']');
+    if (endIdx > -1) {
+      categoryTag = displayCaption.substring(8, endIdx);
+      displayCaption = displayCaption.substring(endIdx + 1).trim();
+    }
+  } else if (displayCaption.startsWith('[Completed:')) {
+    const endIdx = displayCaption.indexOf(']');
+    if (endIdx > -1) {
+      categoryTag = displayCaption.substring(11, endIdx);
+      displayCaption = displayCaption.substring(endIdx + 1).trim();
+    }
+  }
+
+  const isAdvice = post.post_type === 'squad_advice' || post.advice_category || displayCaption.startsWith('[Advice:');
+  const isTaskCompletion = post.post_type === 'task_completion' || displayCaption.startsWith('[Completed:');
 
   const groupedReactions = EMOJIS.map((emoji) => {
     const matching = localReactions.filter((r) => r.emoji === emoji);
@@ -98,10 +125,23 @@ export default function CirclePostCard({ post, currentUserId, onPostUpdated }) {
     }
   };
 
-  const formattedTime = new Date(post.created_at).toLocaleTimeString('en-US', {
+  const handleAddComment = (e) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    setComments(prev => [
+      ...prev,
+      { id: Date.now(), user: 'You', text: newComment.trim() }
+    ]);
+    setNewComment('');
+  };
+
+  const formattedTime = new Date(post.created_at || Date.now()).toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit'
   });
+
+  const userNameDisplay = post.user_name || 'Member';
+  const handleName = userNameDisplay.toLowerCase().replace(/\s+/g, '_');
 
   return (
     <>
@@ -121,11 +161,7 @@ export default function CirclePostCard({ post, currentUserId, onPostUpdated }) {
         initial={{ opacity: 0, y: 24, scale: 0.98 }}
         animate={inView ? { opacity: 1, y: 0, scale: 1 } : {}}
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-        className={`relative rounded-3xl overflow-hidden shadow-card border mb-4 ${
-          isAdvice
-            ? 'bg-gradient-to-br from-primary/5 via-surface-container-lowest to-indigo-50/50 border-primary/30 ring-1 ring-primary/10'
-            : 'bg-surface-container-lowest border-outline-variant/20'
-        }`}
+        className="bg-surface-container-lowest rounded-[24px] shadow-sm overflow-hidden flex flex-col border border-outline-variant/20 mb-4"
       >
         {/* Error banner */}
         {errorMessage && (
@@ -135,217 +171,237 @@ export default function CirclePostCard({ post, currentUserId, onPostUpdated }) {
           </div>
         )}
 
-        {/* ── SQUAD WISDOM / ADVICE CARD SPECIFIC HEADER ── */}
-        {isAdvice && (
-          <div className="px-4 pt-3 pb-1 flex items-center justify-between border-b border-primary/10">
-            <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-primary text-on-primary shadow-xs">
-              💡 {post.advice_category || 'Squad Wisdom'}
-            </span>
-            <span className="text-[10px] text-primary font-bold">Well-being Tip</span>
-          </div>
-        )}
+        {/* ── STITCH NEAT INSTAGRAM POST HEADER ── */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-outline-variant/10">
+          <div className="flex items-center gap-2.5">
+            <div className={`w-10 h-10 rounded-full p-[2px] flex items-center justify-center flex-shrink-0 ${
+              isAdvice
+                ? 'bg-gradient-to-tr from-emerald-400 to-teal-600'
+                : isTaskCompletion
+                ? 'bg-gradient-to-tr from-amber-500 to-rose-500'
+                : 'bg-gradient-to-tr from-primary via-purple-500 to-rose-500'
+            }`}>
+              <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-xs">
+                {post.user_avatar ? (
+                  <img src={post.user_avatar} alt={userNameDisplay} className="w-full h-full object-cover" />
+                ) : (
+                  userNameDisplay.charAt(0).toUpperCase()
+                )}
+              </div>
+            </div>
 
-        {/* ── PHOTO HERO (full-bleed Instagram post style) ── */}
+            <div className="flex flex-col">
+              <div className="flex items-center gap-1.5">
+                <span className="font-headline text-sm font-bold text-on-surface tracking-tight">
+                  {handleName}
+                </span>
+                <Icon name="verified" size={15} className="text-primary" filled />
+                <span className="text-[11px] text-on-surface-variant">• {formattedTime}</span>
+              </div>
+              <span className="font-body text-[11px] text-on-surface-variant flex items-center gap-1">
+                {isAdvice ? (
+                  <>💡 {categoryTag || 'Squad Wisdom'}</>
+                ) : isTaskCompletion ? (
+                  <>🏆 {categoryTag || 'Task Accomplishment'}</>
+                ) : (
+                  <>Titan Squad · Verified 🏃</>
+                )}
+              </span>
+            </div>
+          </div>
+
+          {/* Owner options menu button */}
+          {isOwner && (
+            <div className="relative">
+              <button
+                onClick={() => setShowMenu(prev => !prev)}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container transition-colors"
+              >
+                <Icon name="more_horiz" size={20} />
+              </button>
+              <AnimatePresence>
+                {showMenu && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: -6 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -6 }}
+                    className="absolute right-0 top-9 z-30 bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/30 rounded-2xl shadow-2xl py-1.5 w-36"
+                  >
+                    <button
+                      onClick={() => { setIsEditing(true); setShowMenu(false); }}
+                      className="w-full px-3 py-2 text-left text-xs text-on-surface hover:bg-surface-container-high flex items-center gap-2 font-medium"
+                    >
+                      <Icon name="edit" className="text-sm text-primary" />
+                      <span>Edit Caption</span>
+                    </button>
+                    <button
+                      onClick={() => { setShowDeleteModal(true); setShowMenu(false); }}
+                      className="w-full px-3 py-2 text-left text-xs text-error hover:bg-error/10 flex items-center gap-2 font-medium"
+                    >
+                      <Icon name="delete" className="text-sm" />
+                      <span>Delete Post</span>
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+
+        {/* ── CARD BODY (PHOTO / WISDOM GRAPHIC / TASK CARD) ── */}
+
+        {/* PHOTO POST CARD */}
         {post.photo_url ? (
-          <div className="relative w-full aspect-[4/5] bg-surface-container-high overflow-hidden">
+          <div className="relative w-full aspect-[16/9] overflow-hidden bg-surface-container">
             <img
               src={post.photo_url}
-              alt={post.caption || 'Circle snap'}
+              alt={displayCaption || 'Circle snap'}
               className="w-full h-full object-cover"
               loading="lazy"
             />
-
-            {/* Top gradient overlay */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-transparent to-black/80 pointer-events-none" />
-
-            {/* Author chip — top-left */}
-            <div className="absolute top-3 left-3 flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full ring-2 ring-white/80 bg-primary/80 text-white font-headline font-extrabold text-xs flex items-center justify-center backdrop-blur-sm shadow-md">
-                {post.user_name?.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <div>
-                <p className="text-white text-xs font-headline font-bold drop-shadow-md">{post.user_name}</p>
-                <p className="text-white/80 text-[10px] drop-shadow-sm font-medium">{formattedTime}</p>
-              </div>
+            {/* Top-left completion badge overlay */}
+            <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-white font-label text-[11px] font-semibold flex items-center gap-1.5 shadow-sm">
+              <Icon name="check_circle" size={14} className="text-emerald-400" filled />
+              <span>{categoryTag ? `Completed: ${categoryTag}` : 'Completed: Daily Routine'}</span>
             </div>
-
-            {/* Owner menu — top-right */}
-            {isOwner && (
-              <div className="absolute top-3 right-3">
-                <button
-                  onClick={() => setShowMenu(prev => !prev)}
-                  className="w-8 h-8 rounded-full bg-black/40 backdrop-blur-md text-white flex items-center justify-center hover:bg-black/60 transition-colors shadow-md"
-                >
-                  <Icon name="more_vert" className="text-base" />
-                </button>
-                <AnimatePresence>
-                  {showMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9, y: -6 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.9, y: -6 }}
-                      transition={{ duration: 0.15 }}
-                      className="absolute right-0 top-10 z-30 bg-surface-container-lowest/95 backdrop-blur-xl border border-outline-variant/30 rounded-2xl shadow-2xl py-1.5 w-36"
-                    >
-                      <button
-                        onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                        className="w-full px-3 py-2 text-left text-xs text-on-surface hover:bg-surface-container-high flex items-center gap-2 font-medium"
-                      >
-                        <Icon name="edit" className="text-sm text-primary" />
-                        <span>Edit Caption</span>
-                      </button>
-                      <button
-                        onClick={() => { setShowDeleteModal(true); setShowMenu(false); }}
-                        className="w-full px-3 py-2 text-left text-xs text-error hover:bg-error/10 flex items-center gap-2 font-medium"
-                      >
-                        <Icon name="delete" className="text-sm" />
-                        <span>Delete Post</span>
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            )}
-
-            {/* Caption overlaid at bottom of photo */}
-            {!isEditing && post.caption && (
-              <div className="absolute bottom-14 left-0 right-0 px-4">
-                {isTaskCompletion && (
-                  <span className="inline-block mb-1 text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-400 text-slate-900 shadow-md">
-                    🏆 Task Accomplished
-                  </span>
-                )}
-                <p className="text-white text-sm font-medium drop-shadow-md leading-snug line-clamp-3">
-                  {post.caption}
-                </p>
-              </div>
-            )}
-
-            {/* Reactions row — floating at bottom of photo */}
-            <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                {groupedReactions.map(({ emoji, count, hasReacted }) => (
-                  <motion.button
-                    key={emoji}
-                    whileTap={{ scale: 0.8 }}
-                    whileHover={{ scale: 1.12 }}
-                    onClick={(e) => handleEmojiClick(emoji, e)}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold backdrop-blur-md transition-all ${
-                      hasReacted
-                        ? 'bg-surface-container-lowest text-on-surface shadow-lg ring-1 ring-black/10'
-                        : 'bg-black/40 text-white hover:bg-black/60'
-                    }`}
-                  >
-                    <span>{emoji}</span>
-                    {count > 0 && <span className="text-[10px]">{count}</span>}
-                  </motion.button>
-                ))}
-              </div>
+            {/* Top-right streak/data badge overlay */}
+            <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white font-data text-[11px] flex items-center gap-1">
+              <Icon name="speed" size={13} />
+              <span>🔥 Streaks Active</span>
             </div>
+          </div>
+        ) : isAdvice ? (
+          /* WISDOM / ADVICE POST GRAPHIC CARD */
+          <div className="px-4 py-6 bg-gradient-to-br from-surface-container-low to-surface-container-high/60 mx-3 my-2 rounded-2xl flex flex-col justify-center border border-outline-variant/30 relative overflow-hidden">
+            <div className="absolute -right-6 -bottom-6 w-24 h-24 bg-tertiary-fixed/40 rounded-full blur-xl pointer-events-none"></div>
+            <div className="flex items-center gap-1.5 mb-3">
+              <span className="px-2.5 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed-variant font-label text-[11px] font-semibold">
+                💡 {categoryTag || 'Squad Advice'}
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label text-[11px] font-semibold">
+                🧠 Well-being Tip
+              </span>
+            </div>
+            <p className="font-headline text-base leading-relaxed font-semibold text-on-surface italic pl-2 border-l-3 border-primary">
+              “{displayCaption}”
+            </p>
+          </div>
+        ) : isTaskCompletion ? (
+          /* TASK COMPLETION CARD */
+          <div className="p-4 bg-amber-500/5 mx-3 my-2 rounded-2xl border border-amber-500/20 flex flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-0.5 rounded-full bg-amber-400 text-slate-900 font-label text-[11px] font-extrabold shadow-xs flex items-center gap-1">
+                <span>🏆</span>
+                <span>{categoryTag || 'Task Accomplished'}</span>
+              </span>
+              <span className="text-[10px] text-amber-700 font-semibold">Verified by LifeOS</span>
+            </div>
+            <p className="font-body text-sm font-medium text-on-surface leading-relaxed">
+              {displayCaption}
+            </p>
           </div>
         ) : (
-          /* TEXT / WISDOM POST CARD */
-          <div className="relative p-5 flex flex-col justify-between">
-            {/* Author row */}
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-headline font-extrabold text-xs flex items-center justify-center shadow-xs">
-                  {post.user_name?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div>
-                  <p className="text-on-surface text-xs font-headline font-bold">{post.user_name}</p>
-                  <p className="text-on-surface-variant text-[10px]">{formattedTime}</p>
-                </div>
-              </div>
-              {isOwner && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowMenu(prev => !prev)}
-                    className="w-8 h-8 rounded-full bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high flex items-center justify-center transition-colors"
-                  >
-                    <Icon name="more_vert" className="text-base" />
-                  </button>
-                  <AnimatePresence>
-                    {showMenu && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.9, y: -6 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.9, y: -6 }}
-                        className="absolute right-0 top-9 z-30 bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/30 rounded-2xl shadow-2xl py-1.5 w-36"
-                      >
-                        <button
-                          onClick={() => { setIsEditing(true); setShowMenu(false); }}
-                          className="w-full px-3 py-2 text-left text-xs text-on-surface hover:bg-surface-container-high flex items-center gap-2 font-medium"
-                        >
-                          <Icon name="edit" className="text-sm text-primary" />
-                          <span>Edit Caption</span>
-                        </button>
-                        <button
-                          onClick={() => { setShowDeleteModal(true); setShowMenu(false); }}
-                          className="w-full px-3 py-2 text-left text-xs text-error hover:bg-error/10 flex items-center gap-2 font-medium"
-                        >
-                          <Icon name="delete" className="text-sm" />
-                          <span>Delete Post</span>
-                        </button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              )}
-            </div>
-
-            {/* Post Content */}
-            {post.caption && (
-              <div className="mb-4">
-                {isTaskCompletion && (
-                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-700 text-[11px] font-bold mb-2 border border-amber-500/20">
-                    <span>🏆</span>
-                    <span>Task Completed</span>
-                  </div>
-                )}
-                <p className={`leading-relaxed ${
-                  isAdvice
-                    ? 'text-on-surface text-sm font-headline font-bold italic border-l-3 border-primary pl-3 py-0.5'
-                    : 'text-on-surface text-sm font-medium'
-                }`}>
-                  {post.caption}
-                </p>
-              </div>
-            )}
-
-            {/* Reactions row */}
-            <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-outline-variant/15">
-              <div className="flex items-center gap-1.5">
-                {groupedReactions.map(({ emoji, count, hasReacted }) => (
-                  <motion.button
-                    key={emoji}
-                    whileTap={{ scale: 0.8 }}
-                    whileHover={{ scale: 1.12 }}
-                    onClick={(e) => handleEmojiClick(emoji, e)}
-                    className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all ${
-                      hasReacted
-                        ? 'bg-primary text-on-primary shadow-sm'
-                        : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high'
-                    }`}
-                  >
-                    <span>{emoji}</span>
-                    {count > 0 && <span className="text-[10px]">{count}</span>}
-                  </motion.button>
-                ))}
-              </div>
-
-              {isAdvice && (
-                <button
-                  type="button"
-                  onClick={(e) => handleEmojiClick('💪', e)}
-                  className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-extrabold hover:bg-primary/20 transition-all"
-                >
-                  <span>📌 Useful</span>
-                </button>
-              )}
-            </div>
+          /* REGULAR TEXT UPDATE CARD */
+          <div className="px-4 py-3">
+            <p className="font-body text-sm text-on-surface leading-relaxed">
+              {displayCaption}
+            </p>
           </div>
         )}
+
+        {/* ── STITCH INSTAGRAM ACTION BAR ── */}
+        <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+          <div className="flex items-center gap-4 text-on-surface">
+            <button
+              onClick={() => setIsLiked(prev => !prev)}
+              className={`flex items-center gap-1 transition-transform active:scale-90 ${isLiked ? 'text-rose-500' : 'hover:text-rose-500'}`}
+            >
+              <Icon name="favorite" size={24} filled={isLiked} />
+            </button>
+            <button
+              onClick={() => setShowComments(prev => !prev)}
+              className="flex items-center gap-1 hover:text-primary transition-colors active:scale-90 text-on-surface"
+            >
+              <Icon name="chat_bubble" size={24} />
+            </button>
+          </div>
+          <button className="text-on-surface hover:text-primary transition-colors active:scale-90">
+            <Icon name="bookmark" size={24} />
+          </button>
+        </div>
+
+        {/* ── POST BODY & ENGAGEMENT CONTENT ── */}
+        <div className="px-4 pb-4 flex flex-col gap-2.5">
+          {/* Likes line */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <span className="font-label text-xs text-on-surface font-semibold">
+              <span className="font-bold">{isLiked ? '1 like' : 'Liked by squad members'}</span>
+            </span>
+          </div>
+
+          {/* Caption text line (if photo post) */}
+          {post.photo_url && displayCaption && (
+            <p className="font-body text-xs text-on-surface leading-snug">
+              <span className="font-bold font-headline mr-1.5 text-on-surface">{handleName}</span>
+              {displayCaption}
+            </p>
+          )}
+
+          {/* Accountability Emoji Reaction Chips (Squad Boosters) */}
+          <div className="flex items-center gap-1.5 py-1">
+            {groupedReactions.map(({ emoji, count, hasReacted }) => (
+              <motion.button
+                key={emoji}
+                whileTap={{ scale: 0.8 }}
+                whileHover={{ scale: 1.08 }}
+                onClick={(e) => handleEmojiClick(emoji, e)}
+                className={`px-3 py-1 rounded-full font-data text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 ${
+                  hasReacted
+                    ? 'bg-primary text-on-primary shadow-xs'
+                    : 'bg-surface-container-low text-on-surface hover:bg-surface-container'
+                }`}
+              >
+                <span>{emoji}</span>
+                <span className="font-semibold text-[11px]">{count}</span>
+              </motion.button>
+            ))}
+          </div>
+
+          {/* Comments Section Toggle */}
+          {comments.length > 0 && (
+            <button
+              onClick={() => setShowComments(prev => !prev)}
+              className="text-left font-body text-xs text-on-surface-variant hover:text-on-surface transition-colors pt-0.5 font-medium"
+            >
+              {showComments ? 'Hide comments' : `View all ${comments.length} comment${comments.length > 1 ? 's' : ''}`}
+            </button>
+          )}
+
+          {showComments && (
+            <div className="flex flex-col gap-1.5 pt-1">
+              {comments.map((c) => (
+                <div key={c.id} className="font-body text-xs text-on-surface leading-tight bg-surface-container-low/50 p-2 rounded-xl">
+                  <span className="font-bold mr-1.5 text-primary">{c.user}</span>
+                  <span>{c.text}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add a comment input bar */}
+          <form onSubmit={handleAddComment} className="flex items-center justify-between pt-2 border-t border-outline-variant/15 text-xs">
+            <input
+              type="text"
+              placeholder={`Add a comment for ${userNameDisplay}...`}
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              className="flex-1 bg-transparent border-none text-xs text-on-surface placeholder-on-surface-variant/60 focus:outline-none pr-2"
+            />
+            <button type="submit" disabled={!newComment.trim()} className="text-primary font-bold text-xs disabled:opacity-40">
+              Post
+            </button>
+          </form>
+        </div>
 
         {/* Inline caption edit mode */}
         {isEditing && (
