@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import FinanceSettingsSheet from '../components/ui/FinanceSettingsSheet';
+import DatePickerModal from '../components/ui/DatePickerModal';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials } from '../db/database';
 import { 
@@ -62,30 +63,7 @@ export default function ExpensesTab() {
   const [logDate, setLogDate] = useState(today);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Week strip generator around today
-  const weekStripDays = useMemo(() => {
-    const curr = new Date(today);
-    const day = curr.getDay(); // 0 is Sun
-    const mondayDiff = day === 0 ? -6 : 1 - day;
-    const monday = new Date(curr);
-    monday.setDate(curr.getDate() + mondayDiff);
-
-    const days = [];
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(monday);
-      d.setDate(monday.getDate() + i);
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      days.push({
-        name: dayNames[i],
-        dayNum: d.getDate(),
-        dateStr,
-        isToday: dateStr === today
-      });
-    }
-    return days;
-  }, [today]);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Load Financial Data
   const loadFinancialData = useCallback(async () => {
@@ -204,6 +182,25 @@ export default function ExpensesTab() {
       return (b.timestamp || '').localeCompare(a.timestamp || '');
     });
   }, [expenses, selectedDate, selectedCategoryFilter]);
+
+  // Selected Day Spend Total
+  const selectedDaySpent = useMemo(() => {
+    if (!selectedDate) return 0;
+    return expenses
+      .filter(e => e.date === selectedDate)
+      .reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  }, [expenses, selectedDate]);
+
+  // Handle Day Selection from Calendar
+  const handleSelectDay = (dateStr) => {
+    if (!dateStr) return;
+    const dateMonth = dateStr.slice(0, 7);
+    if (dateMonth !== selectedMonth) {
+      setSelectedMonth(dateMonth);
+    }
+    setSelectedDate(dateStr);
+    setShowDatePicker(false);
+  };
 
   // Month navigation helpers
   const handlePrevMonth = () => {
@@ -326,29 +323,68 @@ export default function ExpensesTab() {
         <div className="flex flex-col w-full relative pb-6 gap-5">
 
           {/* Interactive Action Bar / Top Level Utility */}
-          <div className="flex items-center justify-between pt-2">
-            {/* Month Picker Button */}
-            <div className="flex items-center gap-1 bg-surface-container rounded-full px-2 py-1 border border-outline-variant/20 shadow-xs">
-              <button
-                onClick={handlePrevMonth}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface transition-colors cursor-pointer"
-              >
-                <Icon name="chevron_left" size={18} />
-              </button>
-              <span className="font-headline font-bold text-xs sm:text-sm text-on-surface px-1.5">
-                {formattedMonth}
-              </span>
-              <button
-                onClick={handleNextMonth}
-                disabled={selectedMonth >= currentMonthStr}
-                className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface disabled:opacity-30 transition-colors cursor-pointer"
-              >
-                <Icon name="chevron_right" size={18} />
-              </button>
+          <div className="flex items-center justify-between pt-2 gap-2">
+            {/* Left Group: Month & Day Filter Controls */}
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {/* Month Picker Button */}
+              <div className="flex items-center gap-1 bg-surface-container rounded-full px-2 py-1 border border-outline-variant/20 shadow-xs">
+                <button
+                  onClick={handlePrevMonth}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface transition-colors cursor-pointer"
+                  title="Previous month"
+                >
+                  <Icon name="chevron_left" size={18} />
+                </button>
+                <span className="font-headline font-bold text-xs sm:text-sm text-on-surface px-1">
+                  {formattedMonth}
+                </span>
+                <button
+                  onClick={handleNextMonth}
+                  disabled={selectedMonth >= currentMonthStr}
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface disabled:opacity-30 transition-colors cursor-pointer"
+                  title="Next month"
+                >
+                  <Icon name="chevron_right" size={18} />
+                </button>
+              </div>
+
+              {/* Day Filter / Calendar Button */}
+              <div className="flex items-center">
+                {selectedDate ? (
+                  <div className="flex items-center bg-primary text-white rounded-full pl-2.5 pr-1.5 py-1 text-xs font-bold shadow-xs gap-1.5">
+                    <button
+                      onClick={() => setShowDatePicker(true)}
+                      className="flex items-center gap-1 cursor-pointer hover:opacity-90"
+                      title="Change day filter"
+                    >
+                      <Icon name="calendar_today" size={14} />
+                      <span>
+                        {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </button>
+                    <button
+                      onClick={() => setSelectedDate(null)}
+                      className="w-5 h-5 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center cursor-pointer transition-colors"
+                      title="Clear day filter (show all month)"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowDatePicker(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors cursor-pointer border border-outline-variant/20 shadow-xs"
+                    title="Filter by day with calendar"
+                  >
+                    <Icon name="calendar_today" size={14} className="text-primary" />
+                    <span>Day</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Utility Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 onClick={() => navigate('/portfolio')}
                 className="px-3 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
@@ -381,6 +417,17 @@ export default function ExpensesTab() {
                     <button
                       onClick={() => {
                         setShowMenuDropdown(false);
+                        setShowDatePicker(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                    >
+                      <span>📅</span>
+                      <span>Pick Specific Date</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenuDropdown(false);
                         downloadCSV(expenses, `lifeos-expenses-${selectedMonth}.csv`);
                       }}
                       className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
@@ -404,6 +451,54 @@ export default function ExpensesTab() {
               </div>
             </div>
           </div>
+
+          {/* Active Day Spend Banner */}
+          {selectedDate && (
+            <div className="flex items-center justify-between p-3.5 sm:p-4 rounded-2xl bg-gradient-to-r from-primary/15 via-primary/5 to-surface-container-lowest border border-primary/30 shadow-xs animate-fadeIn">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-11 h-11 rounded-2xl bg-primary text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Icon name="event_available" size={22} />
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider text-primary">
+                      Spent on Day
+                    </span>
+                    <span className="text-[10px] text-outline font-medium">
+                      ({filteredExpenses.length} {filteredExpenses.length === 1 ? 'expense' : 'expenses'})
+                    </span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="font-mono text-xl sm:text-2xl font-black text-on-surface">
+                      ₹{selectedDaySpent.toLocaleString('en-IN')}
+                    </span>
+                    <span className="text-xs text-on-surface-variant font-medium truncate">
+                      {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <button
+                  onClick={() => setShowDatePicker(true)}
+                  className="px-2.5 py-1.5 rounded-xl bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                  title="Pick a different date"
+                >
+                  <Icon name="calendar_month" size={14} />
+                  <span className="hidden sm:inline">Change</span>
+                </button>
+                <button
+                  onClick={() => setSelectedDate(null)}
+                  className="px-2.5 py-1.5 rounded-xl bg-surface-container-high hover:bg-outline-variant/30 text-on-surface text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
+                  title="Reset to whole month view"
+                >
+                  <Icon name="close" size={14} />
+                  <span>All Month</span>
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Concentric Ring & Radial Cashflow Card */}
           <div className="relative overflow-hidden rounded-[28px] bg-surface-container-lowest shadow-card border border-outline-variant/20 p-5 sm:p-6 flex flex-col items-center">
@@ -466,9 +561,11 @@ export default function ExpensesTab() {
             {/* Compact Horizontal 3-Column Footer with Daily Metrics */}
             <div className="w-full mt-4 pt-3 border-t border-outline-variant/15 grid grid-cols-3 divide-x divide-outline-variant/20 text-center">
               <div className="flex flex-col items-center px-1">
-                <span className="text-[10px] uppercase tracking-wider text-outline font-bold">SPENT TODAY</span>
+                <span className="text-[10px] uppercase tracking-wider text-outline font-bold truncate max-w-full">
+                  {selectedDate ? 'SPENT ON DAY' : 'SPENT TODAY'}
+                </span>
                 <span className="font-mono text-xs sm:text-sm font-bold text-on-surface mt-0.5">
-                  ₹{todaySpent.toLocaleString('en-IN')}
+                  ₹{(selectedDate ? selectedDaySpent : todaySpent).toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="flex flex-col items-center px-1">
@@ -572,12 +669,16 @@ export default function ExpensesTab() {
           {/* Recent Expenses Section */}
           <div className="flex flex-col w-full gap-2.5">
             <div className="flex items-center justify-between px-1">
-              <div className="flex items-baseline gap-2">
-                <h2 className="font-headline text-base sm:text-lg font-bold text-on-surface">
+              <div className="flex items-baseline gap-2 min-w-0">
+                <h2 className="font-headline text-base sm:text-lg font-bold text-on-surface shrink-0">
                   Expenses
                 </h2>
-                <span className="text-xs text-outline font-medium">
-                  {selectedDate ? selectedDate : selectedCategoryFilter ? `${selectedCategoryFilter} Filter` : formattedMonth}
+                <span className="text-xs text-outline font-medium truncate">
+                  {selectedDate 
+                    ? `· ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} (${filteredExpenses.length})` 
+                    : selectedCategoryFilter 
+                      ? `· ${selectedCategoryFilter} (${filteredExpenses.length})` 
+                      : `· ${formattedMonth} (${filteredExpenses.length})`}
                 </span>
               </div>
 
@@ -587,9 +688,10 @@ export default function ExpensesTab() {
                     setSelectedDate(null);
                     setSelectedCategoryFilter(null);
                   }}
-                  className="text-xs font-bold text-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0"
                 >
-                  Clear Filter
+                  <Icon name="restart_alt" size={14} />
+                  <span>Reset Filter</span>
                 </button>
               )}
             </div>
@@ -601,13 +703,23 @@ export default function ExpensesTab() {
                   Loading expenses...
                 </div>
               ) : filteredExpenses.length === 0 ? (
-                <div className="p-8 text-center space-y-1">
-                  <p className="font-headline font-bold text-xs text-secondary">
-                    No Expenses Found
+                <div className="p-8 text-center space-y-1.5">
+                  <p className="font-headline font-bold text-xs sm:text-sm text-secondary">
+                    {selectedDate ? 'No Expenses on This Day' : 'No Expenses Found'}
                   </p>
-                  <p className="text-[11px] text-outline">
-                    No transactions recorded for this selected criteria.
+                  <p className="text-[11px] text-outline max-w-xs mx-auto">
+                    {selectedDate 
+                      ? `No transactions recorded for ${new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}. You spent ₹0 on this day.` 
+                      : 'No transactions recorded for this selected criteria.'}
                   </p>
+                  {selectedDate && (
+                    <button
+                      onClick={() => setSelectedDate(null)}
+                      className="mt-2 text-xs text-primary font-bold hover:underline cursor-pointer inline-flex items-center gap-1"
+                    >
+                      <span>Show all {formattedMonth} expenses</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 filteredExpenses.map((exp) => {
@@ -821,6 +933,14 @@ export default function ExpensesTab() {
           </div>
         </div>
       )}
+
+      {/* Date Picker Modal for Day Filtering */}
+      <DatePickerModal
+        isOpen={showDatePicker}
+        onClose={() => setShowDatePicker(false)}
+        selectedDate={selectedDate || today}
+        onSelectDate={handleSelectDay}
+      />
 
       {/* Finance Settings Sheet */}
       <FinanceSettingsSheet

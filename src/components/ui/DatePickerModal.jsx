@@ -85,6 +85,12 @@ export default function DatePickerModal({ isOpen, onClose, selectedDate, onSelec
         {/* Quick Date Selection Chips */}
         <div className="flex gap-2 justify-center">
           <button
+            onClick={() => handleSelectQuick(-1)}
+            className="px-3.5 py-1.5 rounded-full bg-surface-container-high text-on-surface text-xs font-bold hover:bg-surface-container transition-all border border-outline-variant/20"
+          >
+            Yesterday
+          </button>
+          <button
             onClick={() => handleSelectQuick(0)}
             className="px-3.5 py-1.5 rounded-full bg-primary/10 text-primary text-xs font-bold hover:bg-primary/20 transition-all border border-primary/20"
           >
@@ -95,12 +101,6 @@ export default function DatePickerModal({ isOpen, onClose, selectedDate, onSelec
             className="px-3.5 py-1.5 rounded-full bg-surface-container-high text-on-surface text-xs font-bold hover:bg-surface-container transition-all border border-outline-variant/20"
           >
             Tomorrow
-          </button>
-          <button
-            onClick={() => handleSelectQuick(7)}
-            className="px-3.5 py-1.5 rounded-full bg-surface-container-high text-on-surface text-xs font-bold hover:bg-surface-container transition-all border border-outline-variant/20"
-          >
-            In 1 Week
           </button>
         </div>
 
