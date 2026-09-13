@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import QuickLoggerBar from '../components/ui/QuickLoggerBar';
 import DailyFocusBriefingModal from '../components/dashboard/DailyFocusBriefingModal';
-import HabitTaskStudioSheet from '../components/schedule/HabitTaskStudioSheet';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
 import { 
   fetchCloudExpenses, 
@@ -79,7 +78,6 @@ export default function DashboardTab() {
 
   // Modals
   const [showBriefingModal, setShowBriefingModal] = useState(false);
-  const [showStudioSheet, setShowStudioSheet] = useState(false);
 
   // Formatted Date
   const dateStr = useMemo(() => {
@@ -406,8 +404,8 @@ export default function DashboardTab() {
               </div>
 
               <button 
-                onClick={() => setShowStudioSheet(true)}
-                className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors py-1 px-2.5 rounded-xl font-semibold text-xs hover:bg-surface-container-low"
+                onClick={() => navigate('/studio')}
+                className="flex items-center gap-1 text-on-surface-variant hover:text-primary transition-colors py-1 px-2.5 rounded-xl font-semibold text-xs hover:bg-surface-container-low cursor-pointer"
               >
                 <Icon name="tune" size={16} />
                 <span>Manage</span>
@@ -423,8 +421,8 @@ export default function DashboardTab() {
                   Create daily non-negotiable habits to build momentum and power your day.
                 </p>
                 <button
-                  onClick={() => setShowStudioSheet(true)}
-                  className="mt-2 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-xs"
+                  onClick={() => navigate('/studio')}
+                  className="mt-2 px-4 py-2 rounded-full bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-xs cursor-pointer"
                 >
                   Configure Habits in Studio
                 </button>
@@ -686,13 +684,6 @@ export default function DashboardTab() {
 
         </div>
       </main>
-
-      {/* Habit & Task Studio Bottom Sheet */}
-      <HabitTaskStudioSheet
-        isOpen={showStudioSheet}
-        onClose={() => setShowStudioSheet(false)}
-        onDataChanged={loadCockpitData}
-      />
 
       {/* Daily Focus Briefing Modal */}
       <DailyFocusBriefingModal
