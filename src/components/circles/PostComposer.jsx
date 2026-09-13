@@ -4,11 +4,13 @@ import Icon from '../ui/Icon';
 import { compressImage } from '../../lib/imageUtils';
 import { uploadCirclePhoto, createCirclePost } from '../../lib/supabase';
 
-const ADVICE_CATEGORIES = ['Financial', 'Health & Spine', 'Habit Hack', 'Career & Focus'];
+const ADVICE_CATEGORIES = ['Financial', 'Health & Spine', 'Habit Hack', 'Mindset & Focus', 'Career'];
+const TASK_TAGS = ['Morning Routine', 'Workout 5km', 'Deep Work Sprint', 'Cold Shower', 'Meditation'];
 
 export default function PostComposer({ circleId, onPostCreated }) {
-  const [postMode, setPostMode] = useState('snap'); // 'snap' | 'advice'
+  const [postMode, setPostMode] = useState('snap'); // 'snap' | 'advice' | 'task' | 'text'
   const [adviceCategory, setAdviceCategory] = useState('Financial');
+  const [taskTag, setTaskTag] = useState('Morning Routine');
   
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -51,12 +53,24 @@ export default function PostComposer({ circleId, onPostCreated }) {
       let photoUrl = null;
       if (selectedFile) photoUrl = await uploadCirclePhoto(selectedFile);
       
+      let finalType = 'photo';
+      let formattedCaption = caption.trim();
+
+      if (postMode === 'advice') {
+        finalType = 'squad_advice';
+        formattedCaption = `[Advice:${adviceCategory}] ${formattedCaption}`;
+      } else if (postMode === 'task') {
+        finalType = 'task_completion';
+        formattedCaption = `[Completed:${taskTag}] ${formattedCaption}`;
+      } else if (!selectedFile && postMode === 'snap') {
+        finalType = 'text';
+      }
+
       await createCirclePost({
         circleId,
         photoUrl,
-        caption,
-        postType: postMode === 'advice' ? 'squad_advice' : (selectedFile ? 'photo' : 'text'),
-        adviceCategory: postMode === 'advice' ? adviceCategory : null
+        caption: formattedCaption,
+        postType: finalType
       });
 
       handleClearImage();
@@ -72,8 +86,8 @@ export default function PostComposer({ circleId, onPostCreated }) {
   return (
     <div className="rounded-3xl overflow-hidden shadow-card border border-outline-variant/20 bg-surface-container-lowest mb-4">
       {/* Mode Switcher Bar */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-1 border-b border-outline-variant/15">
-        <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-2xl">
+      <div className="flex items-center justify-between px-3 pt-3 pb-2 border-b border-outline-variant/15 overflow-x-auto scrollbar-none">
+        <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-2xl flex-shrink-0">
           <button
             type="button"
             onClick={() => setPostMode('snap')}
@@ -83,7 +97,7 @@ export default function PostComposer({ circleId, onPostCreated }) {
                 : 'text-on-surface-variant hover:text-on-surface'
             }`}
           >
-            📸 Photo / Snap
+            📸 Photo
           </button>
           <button
             type="button"
@@ -96,11 +110,18 @@ export default function PostComposer({ circleId, onPostCreated }) {
           >
             💡 Squad Advice
           </button>
+          <button
+            type="button"
+            onClick={() => setPostMode('task')}
+            className={`px-3 py-1 rounded-xl text-xs font-headline font-bold transition-all ${
+              postMode === 'task'
+                ? 'bg-secondary text-on-secondary shadow-xs'
+                : 'text-on-surface-variant hover:text-on-surface'
+            }`}
+          >
+            🏆 Task Win
+          </button>
         </div>
-
-        {postMode === 'advice' && (
-          <span className="text-[10px] text-primary font-bold hidden sm:inline">Well-being Tip</span>
-        )}
       </div>
 
       <AnimatePresence>
@@ -118,11 +139,11 @@ export default function PostComposer({ circleId, onPostCreated }) {
       </AnimatePresence>
 
       <form onSubmit={handleSubmit}>
-        {/* Dynamic Category Tag Selector for Advice */}
+        {/* Dynamic Tag Selector for Advice */}
         {postMode === 'advice' && (
           <div className="p-3 bg-primary/5 border-b border-primary/10">
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
-              <span className="text-[11px] font-bold text-on-surface-variant flex-shrink-0">Tag:</span>
+              <span className="text-[11px] font-bold text-on-surface-variant flex-shrink-0">Category:</span>
               {ADVICE_CATEGORIES.map(cat => (
                 <button
                   key={cat}
@@ -135,6 +156,29 @@ export default function PostComposer({ circleId, onPostCreated }) {
                   }`}
                 >
                   {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Dynamic Tag Selector for Task Win */}
+        {postMode === 'task' && (
+          <div className="p-3 bg-secondary/5 border-b border-secondary/10">
+            <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none py-0.5">
+              <span className="text-[11px] font-bold text-on-surface-variant flex-shrink-0">Accomplishment:</span>
+              {TASK_TAGS.map(tag => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => setTaskTag(tag)}
+                  className={`px-3 py-1 rounded-full text-[10px] font-bold whitespace-nowrap transition-colors flex-shrink-0 ${
+                    taskTag === tag
+                      ? 'bg-secondary text-on-secondary shadow-xs'
+                      : 'bg-surface-container-lowest text-on-surface-variant border border-outline-variant/30 hover:border-secondary/40'
+                  }`}
+                >
+                  {tag}
                 </button>
               ))}
             </div>

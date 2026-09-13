@@ -1,98 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../components/ui/Icon';
 import CreateCircleModal from '../components/circles/CreateCircleModal';
 import JoinCircleModal from '../components/circles/JoinCircleModal';
 import CircleSettingsSheet from '../components/circles/CircleSettingsSheet';
-import MemberDetailSheet from '../components/circles/MemberDetailSheet';
 import SquadScorecardsModal from '../components/circles/SquadScorecardsModal';
 import PostComposer from '../components/circles/PostComposer';
 import CirclePostCard from '../components/circles/CirclePostCard';
+import MemberScoreCard from '../components/circles/MemberScoreCard';
 import {
   fetchMyCircles,
   fetchCircleMembers,
   fetchCircleDailySnapshots,
   fetchCirclePosts,
   publishDailySnapshot,
+  fetchUserProfileName,
+  fetchUserProfileAvatar,
   getSupabase
 } from '../lib/supabase';
-
-// Instagram-style story bubble for each Gang (Circle)
-function GangStoryBubble({ circle, isActive, onClick }) {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.92 }}
-      onClick={onClick}
-      className="flex flex-col items-center gap-1.5 flex-shrink-0 cursor-pointer group"
-    >
-      <div
-        className={`relative w-[60px] h-[60px] rounded-full p-[3px] transition-all ${
-          isActive
-            ? 'bg-gradient-to-tr from-pink-500 via-purple-500 to-primary shadow-md scale-105'
-            : 'bg-surface-container-high hover:bg-outline-variant/40'
-        }`}
-      >
-        <div className="w-full h-full rounded-full bg-surface-container-lowest border-2 border-surface-container-lowest flex items-center justify-center font-headline font-extrabold text-lg text-primary shadow-inner">
-          {circle.name?.charAt(0).toUpperCase() || 'G'}
-        </div>
-        {isActive && (
-          <div className="absolute bottom-0 right-0 w-4 h-4 rounded-full bg-secondary border-2 border-surface-container-lowest flex items-center justify-center">
-            <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-          </div>
-        )}
-      </div>
-      <span className={`text-[11px] font-bold max-w-[68px] truncate transition-colors ${
-        isActive ? 'text-primary font-headline' : 'text-on-surface-variant group-hover:text-on-surface'
-      }`}>
-        {circle.name}
-      </span>
-    </motion.button>
-  );
-}
-
-// Add Gang Story Bubble (+)
-function AddGangStoryBubble({ onCreate, onJoin }) {
-  const [openMenu, setOpenMenu] = useState(false);
-
-  return (
-    <div className="relative flex flex-col items-center gap-1.5 flex-shrink-0">
-      <motion.button
-        whileTap={{ scale: 0.92 }}
-        onClick={() => setOpenMenu(prev => !prev)}
-        className="w-[60px] h-[60px] rounded-full bg-surface-container-low border-2 border-dashed border-primary/40 flex items-center justify-center text-primary hover:bg-primary/5 transition-colors"
-      >
-        <Icon name="add" className="text-2xl" />
-      </motion.button>
-      <span className="text-[11px] font-bold text-on-surface-variant">New Gang</span>
-
-      <AnimatePresence>
-        {openMenu && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 10 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 10 }}
-            className="absolute left-0 top-16 z-30 bg-surface-container-lowest backdrop-blur-xl border border-outline-variant/30 rounded-2xl shadow-2xl p-2 w-40 space-y-1"
-          >
-            <button
-              onClick={() => { onCreate(); setOpenMenu(false); }}
-              className="w-full px-3 py-2 text-left text-xs font-bold text-on-surface hover:bg-surface-container-high rounded-xl flex items-center gap-2"
-            >
-              <Icon name="groups" className="text-primary text-base" />
-              <span>Create Circle</span>
-            </button>
-            <button
-              onClick={() => { onJoin(); setOpenMenu(false); }}
-              className="w-full px-3 py-2 text-left text-xs font-bold text-on-surface hover:bg-surface-container-high rounded-xl flex items-center gap-2"
-            >
-              <Icon name="group_add" className="text-secondary text-base" />
-              <span>Join Circle</span>
-            </button>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
 
 export default function CirclesTab() {
   const [circles, setCircles] = useState([]);
@@ -102,15 +27,21 @@ export default function CirclesTab() {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserName, setCurrentUserName] = useState('');
+  const [userAvatarUrl, setUserAvatarUrl] = useState(null);
 
-  // Modals
+  // Dropdown & Modals state
+  const [showSquadDropdown, setShowSquadDropdown] = useState(false);
+  const dropdownRef = useRef(null);
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [showSettingsSheet, setShowSettingsSheet] = useState(false);
   const [showScorecardsModal, setShowScorecardsModal] = useState(false);
-  
+  const [showComposer, setShowComposer] = useState(false);
+
   // Member Detail Sheet
-  const [selectedMemberDetail, setSelectedMemberDetail] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null);
 
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -120,251 +51,502 @@ export default function CirclesTab() {
       const client = await getSupabase();
       if (client) {
         const { data: { session } } = await client.auth.getSession();
-        if (session?.user) setCurrentUserId(session.user.id);
+        if (session) setCurrentUserId(session.user.id);
       }
-      await publishDailySnapshot(todayStr);
+
+      const [name, avatar] = await Promise.all([
+        fetchUserProfileName(),
+        fetchUserProfileAvatar(),
+      ]);
+      if (name) setCurrentUserName(name);
+      if (avatar) setUserAvatarUrl(avatar);
+
+      await publishDailySnapshot(todayStr).catch(console.error);
+
       const myCircles = await fetchMyCircles();
-      setCircles(myCircles);
-      if (myCircles.length > 0) {
+      setCircles(myCircles || []);
+
+      if (myCircles && myCircles.length > 0) {
         const active = selectedCircle
           ? myCircles.find(c => c.id === selectedCircle.id) || myCircles[0]
           : myCircles[0];
+        
         setSelectedCircle(active);
-      } else {
-        setSelectedCircle(null);
+
+        const [mList, snaps, pList] = await Promise.all([
+          fetchCircleMembers(active.id),
+          fetchCircleDailySnapshots(active.id, todayStr),
+          fetchCirclePosts(active.id),
+        ]);
+
+        setMembers(mList || []);
+        setSnapshots(snaps || {});
+        setPosts(pList || []);
       }
     } catch (err) {
-      console.error('Error loading circles:', err);
+      console.error('Failed to load circle data:', err);
     } finally {
       setLoading(false);
     }
-  }, [todayStr]);
-
-  const loadCircleDetails = useCallback(async (circleId) => {
-    if (!circleId) return;
-    const [memberList, snapshotList, postList] = await Promise.all([
-      fetchCircleMembers(circleId),
-      fetchCircleDailySnapshots(todayStr),
-      fetchCirclePosts(circleId),
-    ]);
-    setMembers(memberList);
-    const snapshotMap = {};
-    snapshotList.forEach(s => { snapshotMap[s.user_id] = s; });
-    setSnapshots(snapshotMap);
-    setPosts(postList);
-  }, [todayStr]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  }, [selectedCircle, todayStr]);
 
   useEffect(() => {
-    if (selectedCircle) loadCircleDetails(selectedCircle.id);
-  }, [selectedCircle, loadCircleDetails]);
+    loadData();
+  }, []);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowSquadDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelectCircle = async (circle) => {
+    setSelectedCircle(circle);
+    setShowSquadDropdown(false);
+    setLoading(true);
+    try {
+      const [mList, snaps, pList] = await Promise.all([
+        fetchCircleMembers(circle.id),
+        fetchCircleDailySnapshots(circle.id, todayStr),
+        fetchCirclePosts(circle.id),
+      ]);
+      setMembers(mList || []);
+      setSnapshots(snaps || {});
+      setPosts(pList || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleToggleComposer = () => {
+    if (!selectedCircle) {
+      setShowCreateModal(true);
+    } else {
+      setShowComposer(prev => !prev);
+    }
+  };
+
+  // Calculate dynamic squad metrics
+  const totalMembersCount = members.length;
+  const activeTodayCount = members.filter(m => (snapshots[m.user_id]?.routine_score || 0) > 0).length;
+  const totalRoutinesCompleted = Object.values(snapshots).reduce(
+    (acc, s) => acc + (s?.routine_score || 0) > 0 ? 1 : 0, 0
+  );
+
+  // Current user metrics
+  const mySnapshot = snapshots[currentUserId];
+  const myRoutineScore = mySnapshot?.routine_score ?? 0;
+  const myTaskScore = mySnapshot?.task_score ?? 0;
+  const myFinStatus = mySnapshot?.financial_status || 'On Track';
+
+  // Squad average pace
+  const snapshotValues = Object.values(snapshots);
+  const squadAvgPace = totalMembersCount > 0 && snapshotValues.length > 0
+    ? Math.round(snapshotValues.reduce((acc, s) => acc + (s?.routine_score || 0), 0) / totalMembersCount)
+    : 0;
 
   return (
-    <div className="min-h-screen pb-28 bg-background">
-      {/* ── TOP HEADER BAR ── */}
-      <div className="px-4 pt-4 pb-3 bg-surface-container-lowest border-b border-outline-variant/20 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h1 className="text-xl font-headline font-extrabold text-on-surface flex items-center gap-2">
-              <span>Circles & Gangs</span>
-            </h1>
-            <p className="text-xs text-on-surface-variant">Daily accountability squad feed</p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="w-9 h-9 rounded-2xl bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors border border-outline-variant/30"
-              title="Join via Code"
-            >
-              <Icon name="group_add" className="text-base" />
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-3.5 py-2 rounded-2xl bg-primary text-on-primary text-xs font-headline font-bold shadow-md hover:brightness-110 transition-all flex items-center gap-1"
-            >
-              <Icon name="add" className="text-sm" />
-              <span>Create</span>
-            </button>
-          </div>
-        </div>
-
-        {/* ── INSTAGRAM-STYLE GANG STORIES ROW ── */}
-        <div className="flex items-center gap-4 overflow-x-auto scrollbar-none py-1">
-          <AddGangStoryBubble
-            onCreate={() => setShowCreateModal(true)}
-            onJoin={() => setShowJoinModal(true)}
-          />
-
-          {circles.map(circle => (
-            <GangStoryBubble
-              key={circle.id}
-              circle={circle}
-              isActive={selectedCircle?.id === circle.id}
-              onClick={() => setSelectedCircle(circle)}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* ── MAIN CONTENT AREA ── */}
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 text-on-surface-variant/50">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+    <div className="flex flex-col w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pb-28 pt-2 select-none gap-6">
+      {/* 1. TOP HEADER BAR WITH SQUAD SELECTOR DROPDOWN */}
+      <header className="flex items-center justify-between pt-1 border-b border-outline-variant/10 pb-3">
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setShowSquadDropdown(prev => !prev)}
+            className="flex items-center gap-2 px-4 py-2 rounded-full bg-surface-container-low hover:bg-surface-container border border-outline-variant/30 text-on-surface font-headline text-base sm:text-lg font-bold tracking-tight transition-all active:scale-95 shadow-xs"
           >
-            <Icon name="sync" className="text-3xl text-primary mb-2" />
-          </motion.div>
-          <p className="text-xs font-medium mt-2">Loading squad feed…</p>
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-secondary"></span>
+            </span>
+            <span>{selectedCircle?.name || 'Select Squad'}</span>
+            <Icon name="keyboard_arrow_down" size={20} className={`text-on-surface-variant transition-transform ${showSquadDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Squad Switcher Dropdown Menu */}
+          <AnimatePresence>
+            {showSquadDropdown && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 4 }}
+                className="absolute left-0 top-14 z-50 w-72 rounded-2xl bg-surface-container-lowest shadow-2xl border border-outline-variant/30 p-2.5 space-y-1"
+              >
+                <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-outline border-b border-outline-variant/15">
+                  Your Squads ({circles.length})
+                </div>
+
+                <div className="max-h-56 overflow-y-auto space-y-0.5 py-1">
+                  {circles.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-on-surface-variant italic">
+                      No squads joined yet
+                    </div>
+                  ) : (
+                    circles.map((c) => {
+                      const isSelected = selectedCircle?.id === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          onClick={() => handleSelectCircle(c)}
+                          className={`w-full px-3 py-2.5 rounded-xl text-left font-headline text-xs font-bold flex items-center justify-between transition-colors ${
+                            isSelected
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-on-surface hover:bg-surface-container-low'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                              isSelected ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface-variant'
+                            }`}>
+                              {c.name?.charAt(0).toUpperCase() || 'S'}
+                            </div>
+                            <span className="truncate">{c.name}</span>
+                          </div>
+                          {isSelected && <Icon name="check" size={16} className="text-primary" />}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+
+                <div className="pt-1.5 border-t border-outline-variant/15 grid grid-cols-2 gap-1.5">
+                  <button
+                    onClick={() => { setShowSquadDropdown(false); setShowCreateModal(true); }}
+                    className="w-full px-3 py-2 text-center text-xs font-bold text-primary hover:bg-primary/10 rounded-xl flex items-center justify-center gap-1.5"
+                  >
+                    <Icon name="add" size={14} />
+                    <span>Create</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowSquadDropdown(false); setShowJoinModal(true); }}
+                    className="w-full px-3 py-2 text-center text-xs font-bold text-secondary hover:bg-secondary/10 rounded-xl flex items-center justify-center gap-1.5"
+                  >
+                    <Icon name="group_add" size={14} />
+                    <span>Join</span>
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
-      ) : circles.length === 0 ? (
-        /* Empty State */
-        <div className="flex flex-col items-center justify-center py-20 px-8 text-center">
-          <motion.div
-            initial={{ scale: 0.6, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
-            className="w-20 h-20 rounded-3xl bg-gradient-to-br from-primary to-primary-container flex items-center justify-center text-white mb-5 shadow-lg shadow-primary/20"
+
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setShowSettingsSheet(true)}
+            className="w-10 h-10 rounded-full flex items-center justify-center text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"
+            title="Circle Settings"
           >
-            <Icon name="groups" className="text-4xl" />
-          </motion.div>
-          <h2 className="text-lg font-headline font-bold text-on-surface mb-1">No Gangs Joined Yet</h2>
-          <p className="text-xs text-on-surface-variant max-w-xs leading-relaxed mb-8">
-            Create an 8-member circle or join an existing gang to share daily progress snaps and tips!
-          </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowJoinModal(true)}
-              className="px-5 py-2.5 rounded-2xl border border-outline-variant/40 bg-surface-container-lowest text-xs font-semibold text-on-surface hover:bg-surface-container-low transition-colors flex items-center gap-1.5 shadow-xs"
-            >
-              <Icon name="group_add" className="text-sm text-secondary" />
-              Join via Code
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-5 py-2.5 rounded-2xl bg-primary text-on-primary text-xs font-bold shadow-md hover:brightness-110 flex items-center gap-1.5"
-            >
-              <Icon name="add" className="text-sm" />
-              Create Circle
-            </button>
-          </div>
+            <Icon name="tune" size={20} />
+          </button>
+          <button
+            onClick={handleToggleComposer}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-on-primary font-label text-xs sm:text-sm font-bold shadow-sm active:scale-95 transition-transform"
+          >
+            <Icon name={showComposer ? "close" : "add"} size={18} />
+            <span>{showComposer ? "Cancel" : "Post"}</span>
+          </button>
         </div>
-      ) : selectedCircle ? (
-        <div className="px-4 pt-4">
-          {/* Active Circle Title & Leaderboard Button */}
-          <div className="flex items-center justify-between mb-4 bg-surface-container-lowest p-3 rounded-2xl border border-outline-variant/20 shadow-xs">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-headline font-bold text-on-surface">
-                  {selectedCircle.name}
-                </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-bold">
-                  {members.length}/8 members
-                </span>
+      </header>
+
+      {/* RESPONSIVE LAYOUT GRID */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+        {/* LEFT COLUMN: SQUAD PULSE, MEMBERS ROSTER, LEADERBOARD */}
+        <div className="lg:col-span-4 flex flex-col gap-4 lg:sticky lg:top-20">
+          
+          {/* 2. CIRCLE PULSE BAR (Gradient Border Card) */}
+          <div className="w-full rounded-2xl p-[1.5px] bg-gradient-to-r from-primary via-purple-500 to-secondary shadow-sm overflow-hidden">
+            <div className="bg-surface-container-lowest/95 backdrop-blur-md rounded-[15px] flex flex-col p-3.5 gap-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-secondary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-secondary"></span>
+                  </span>
+                  <span className="font-headline text-xs font-bold text-on-surface">Squad Pulse</span>
+                  <span className="text-[10px] font-label text-on-surface-variant">· {selectedCircle?.name || 'Squad'}</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-container-low border border-outline-variant/30 text-on-surface font-label text-[10px] font-semibold">
+                    <Icon name="group" size={12} className="text-primary" />
+                    <span>{activeTodayCount}/{totalMembersCount} Active</span>
+                  </div>
+                  <button
+                    onClick={() => setShowSquadDropdown(prev => !prev)}
+                    className="flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-primary-fixed text-on-primary-fixed-variant font-label text-[10px] font-semibold hover:bg-primary-fixed/80 transition-colors active:scale-95"
+                  >
+                    <Icon name="swap_horiz" size={12} />
+                    <span>Switch</span>
+                  </button>
+                </div>
               </div>
-              {selectedCircle.description && (
-                <p className="text-[11px] text-on-surface-variant mt-0.5 line-clamp-1">
-                  {selectedCircle.description}
-                </p>
-              )}
-            </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowScorecardsModal(true)}
-                className="px-3 py-1.5 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-all flex items-center gap-1 border border-primary/20"
-                title="View Squad Scorecards"
-              >
-                <span>🏆 Scorecards</span>
-              </button>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="flex items-center justify-between px-2.5 py-2 rounded-lg bg-surface-container-low/60 border border-outline-variant/20">
+                  <div className="flex flex-col">
+                    <span className="font-label text-[10px] text-on-surface-variant font-medium">Momentum</span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="font-headline text-sm font-bold text-on-surface">🔥 {activeTodayCount} Streaks</span>
+                    </div>
+                  </div>
+                  <span className="px-1.5 py-0.5 rounded-full bg-secondary-fixed/50 text-on-secondary-fixed-variant font-label text-[10px] font-semibold">
+                    Syncing
+                  </span>
+                </div>
 
-              <button
-                onClick={() => setShowSettingsSheet(true)}
-                className="w-8 h-8 rounded-xl bg-surface-container-low hover:bg-surface-container-high text-on-surface-variant flex items-center justify-center transition-colors"
-                title="Circle Settings"
-              >
-                <Icon name="settings" className="text-base" />
-              </button>
+                <div className="flex items-center justify-between px-2.5 py-2 rounded-lg bg-surface-container-low/60 border border-outline-variant/20">
+                  <div className="flex flex-col">
+                    <span className="font-label text-[10px] text-on-surface-variant font-medium">Your Pace</span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="font-headline text-sm font-bold text-on-surface">{myRoutineScore}%</span>
+                      <span className="font-body text-[10px] text-secondary font-semibold">{myFinStatus}</span>
+                    </div>
+                  </div>
+                  <span className="font-data text-[10px] text-primary font-bold">{myRoutineScore > 0 ? `${myRoutineScore}% Done` : '0% Done'}</span>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <div className="w-full bg-surface-container-highest/80 rounded-full h-1.5 overflow-hidden p-0.5">
+                  <div className="h-full rounded-full bg-gradient-to-r from-primary to-secondary transition-all duration-500 shadow-xs" style={{ width: `${Math.max(5, squadAvgPace)}%` }}></div>
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-on-surface-variant">
+                  <span className="font-body">Squad Daily Pace</span>
+                  <span className="font-data font-semibold text-on-surface">{squadAvgPace}% Completed</span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* ── INSTAGRAM SNAP & WISDOM FEED ── */}
-          <div className="space-y-4">
-            {/* Post Composer */}
-            <PostComposer
-              circleId={selectedCircle.id}
-              onPostCreated={() => loadCircleDetails(selectedCircle.id)}
-            />
-
-            {/* Feed Posts */}
-            {posts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-on-surface-variant/60 text-center bg-surface-container-lowest rounded-3xl border border-dashed border-outline-variant/30">
-                <span className="text-4xl mb-3">📸</span>
-                <p className="text-sm font-headline font-bold text-on-surface">No snaps shared today</p>
-                <p className="text-xs text-on-surface-variant mt-1 max-w-xs">
-                  Snap a photo of your workout or share a squad advice tip above!
-                </p>
+          {/* 3. MEMBER AVATARS STORY ROW (Mobile: Horizontal Bar, Desktop: Sleek Roster) */}
+          <div className="lg:hidden w-full overflow-x-auto scrollbar-none flex items-center gap-3.5 py-1">
+            {members.length === 0 ? (
+              <div className="text-xs text-on-surface-variant italic px-1 py-2">
+                No members in this circle yet
               </div>
             ) : (
-              posts.map((post, i) => (
-                <motion.div
-                  key={post.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.35, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
+              members.map((mem) => {
+                const snap = snapshots[mem.user_id];
+                const isDone = (snap?.routines_completed || 0) > 0 || (snap?.routine_score || 0) > 0;
+                const displayName = mem.display_name || mem.user_name || 'Member';
+                const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
+
+                return (
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
+                    key={mem.user_id || mem.id}
+                    onClick={() => setSelectedMember(mem)}
+                    className="flex flex-col items-center gap-1.5 flex-shrink-0 group focus:outline-none"
+                    title={`View ${displayName}'s scorecard`}
+                  >
+                    <div className={`w-[60px] h-[60px] rounded-full p-[2.5px] flex items-center justify-center transition-transform active:scale-95 ${
+                      isDone ? 'bg-secondary' : 'bg-primary-container'
+                    }`}>
+                      <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border-2 border-white flex items-center justify-center text-primary font-headline font-bold text-base shadow-inner overflow-hidden">
+                        {avatar ? (
+                          <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
+                        ) : (
+                          displayName[0].toUpperCase()
+                        )}
+                      </div>
+                    </div>
+                    <span className="font-label text-xs text-on-surface max-w-[68px] truncate text-center font-medium">
+                      {displayName}
+                    </span>
+                  </motion.button>
+                );
+              })
+            )}
+          </div>
+
+          {/* DESKTOP MEMBER ROSTER */}
+          <div className="hidden lg:flex flex-col gap-2.5 bg-surface-container-lowest/80 p-4 rounded-2xl border border-outline-variant/20 shadow-xs">
+            <div className="flex items-center justify-between pb-2 border-b border-outline-variant/15">
+              <span className="font-headline text-xs font-bold text-on-surface uppercase tracking-wider">
+                Squad Members ({members.length})
+              </span>
+              <span className="font-label text-[10px] text-on-surface-variant">Tap to view scorecard</span>
+            </div>
+
+            <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1">
+              {members.length === 0 ? (
+                <div className="text-xs text-on-surface-variant italic py-2">
+                  No members in this circle yet
+                </div>
+              ) : (
+                members.map((mem) => {
+                  const snap = snapshots[mem.user_id];
+                  const isDone = (snap?.routines_completed || 0) > 0 || (snap?.routine_score || 0) > 0;
+                  const displayName = mem.display_name || mem.user_name || 'Member';
+                  const avatar = mem.user_id === currentUserId ? (userAvatarUrl || mem.avatar_url) : mem.avatar_url;
+
+                  return (
+                    <button
+                      key={mem.user_id || mem.id}
+                      onClick={() => setSelectedMember(mem)}
+                      className="flex items-center justify-between p-2 rounded-xl hover:bg-surface-container-low transition-colors group text-left"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className={`w-10 h-10 rounded-full p-[2px] flex items-center justify-center flex-shrink-0 ${
+                          isDone ? 'bg-secondary' : 'bg-primary-container'
+                        }`}>
+                          <div className="w-full h-full rounded-full overflow-hidden bg-surface-container-lowest border border-white flex items-center justify-center text-primary font-headline font-bold text-sm shadow-inner">
+                            {avatar ? (
+                              <img src={avatar} alt={displayName} className="w-full h-full object-cover" />
+                            ) : (
+                              displayName[0].toUpperCase()
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-headline text-xs font-bold text-on-surface truncate group-hover:text-primary transition-colors">
+                            {displayName}
+                          </span>
+                          <span className="font-label text-[10px] text-on-surface-variant">
+                            {isDone ? '🟢 Routine Completed' : '🔵 In Progress'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <Icon name="chevron_right" size={16} className="text-outline group-hover:text-primary transition-colors" />
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* 4. ACTION BANNER: SQUAD SCORECARDS */}
+          <button
+            onClick={() => setShowScorecardsModal(true)}
+            className="w-full h-12 rounded-2xl bg-secondary-container text-on-secondary-container font-headline text-xs font-bold flex items-center justify-center gap-2 shadow-xs active:scale-[0.98] hover:bg-secondary-container/80 transition-all"
+          >
+            <Icon name="emoji_events" size={18} filled />
+            <span>🏆 Squad Scorecards · Weekly Leaderboard</span>
+          </button>
+        </div>
+
+        {/* RIGHT COLUMN: POST COMPOSER & SOCIAL FEED */}
+        <div className="lg:col-span-8 flex flex-col gap-4">
+
+          {/* DESKTOP QUICK POST PROMPT BUTTON (WHEN COMPOSER IS HIDDEN) */}
+          {!showComposer && (
+            <div
+              onClick={handleToggleComposer}
+              className="bg-surface-container-lowest hover:bg-surface-container-low transition-colors p-3.5 rounded-2xl border border-outline-variant/20 shadow-xs flex items-center gap-3 cursor-pointer group"
+            >
+              <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0 overflow-hidden">
+                {userAvatarUrl ? (
+                  <img src={userAvatarUrl} alt="You" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  currentUserName?.[0]?.toUpperCase() || 'U'
+                )}
+              </div>
+              <div className="flex-1 text-xs text-on-surface-variant font-medium">
+                Share an update or proof of routine with {selectedCircle?.name || 'your squad'}...
+              </div>
+              <button className="px-3.5 py-1.5 bg-primary text-on-primary rounded-full text-xs font-bold font-label shadow-xs group-hover:scale-105 transition-transform">
+                + Post
+              </button>
+            </div>
+          )}
+
+          {/* 5. POST COMPOSER CARD (Visible when showComposer is true) */}
+          <AnimatePresence>
+            {showComposer && selectedCircle && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, y: -10 }}
+                animate={{ opacity: 1, height: 'auto', y: 0 }}
+                exit={{ opacity: 0, height: 0, y: -10 }}
+                className="overflow-hidden"
+              >
+                <PostComposer
+                  circleId={selectedCircle.id}
+                  onPostCreated={() => {
+                    setShowComposer(false);
+                    loadData();
+                  }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* 6. SOCIAL FEED */}
+          <div className="flex flex-col gap-4">
+            {posts.length === 0 ? (
+              <div className="p-8 text-center bg-surface-container-lowest rounded-2xl border border-outline-variant/20 shadow-xs flex flex-col items-center justify-center">
+                <Icon name="campaign" size={36} className="text-primary opacity-60 mb-2" />
+                <p className="font-headline font-bold text-base text-on-surface">No updates yet today</p>
+                <p className="font-body text-xs text-on-surface-variant mt-1 max-w-sm leading-relaxed">
+                  Be the first to share your progress or post a workout proof to motivate your squad!
+                </p>
+                <button
+                  onClick={handleToggleComposer}
+                  className="mt-4 px-5 py-2.5 bg-primary text-white rounded-full font-label text-xs font-bold shadow-sm active:scale-95 hover:bg-primary/90 transition-transform"
                 >
-                  <CirclePostCard
-                    post={post}
-                    currentUserId={currentUserId}
-                    onPostUpdated={() => loadCircleDetails(selectedCircle.id)}
-                  />
-                </motion.div>
+                  Post Progress
+                </button>
+              </div>
+            ) : (
+              posts.map((post) => (
+                <CirclePostCard
+                  key={post.id}
+                  post={post}
+                  circleName={selectedCircle?.name}
+                  currentUserId={currentUserId}
+                  onPostUpdated={() => loadData()}
+                />
               ))
             )}
           </div>
         </div>
-      ) : null}
 
-      {/* ── MODALS & SHEETS ── */}
+      </div>
+
+      {/* Modals & Sheets */}
       <CreateCircleModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        onCreated={(circle) => {
-          setCircles(prev => [...prev, circle]);
-          setSelectedCircle(circle);
-        }}
+        onCreated={() => loadData()}
       />
+
       <JoinCircleModal
         isOpen={showJoinModal}
         onClose={() => setShowJoinModal(false)}
         onJoined={() => loadData()}
       />
+
+      <SquadScorecardsModal
+        isOpen={showScorecardsModal}
+        onClose={() => setShowScorecardsModal(false)}
+        members={members}
+        circleName={selectedCircle?.name || 'Titan Squad'}
+      />
+
       <CircleSettingsSheet
         isOpen={showSettingsSheet}
         onClose={() => setShowSettingsSheet(false)}
         circle={selectedCircle}
         members={members}
         currentUserId={currentUserId}
-        onCircleUpdated={loadData}
+        onCircleUpdated={() => loadData()}
+        onOpenCreate={() => setShowCreateModal(true)}
+        onOpenJoin={() => setShowJoinModal(true)}
       />
-      <SquadScorecardsModal
-        isOpen={showScorecardsModal}
-        onClose={() => setShowScorecardsModal(false)}
-        circle={selectedCircle}
-        members={members}
-        snapshots={snapshots}
-        currentUserId={currentUserId}
-        onSelectMember={(member) => setSelectedMemberDetail(member)}
-      />
-      <MemberDetailSheet
-        isOpen={!!selectedMemberDetail}
-        onClose={() => setSelectedMemberDetail(null)}
-        member={selectedMemberDetail}
-        snapshot={selectedMemberDetail ? snapshots[selectedMemberDetail.user_id] : null}
-        isCurrentUser={selectedMemberDetail?.user_id === currentUserId}
-      />
+
+      {selectedMember && (
+        <MemberScoreCard
+          member={selectedMember}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
     </div>
   );
 }

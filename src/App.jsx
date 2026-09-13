@@ -4,6 +4,7 @@ import TopBar from './components/layout/TopBar';
 import BottomNav from './components/layout/BottomNav';
 import DashboardTab from './views/DashboardTab';
 import ScheduleTab from './views/ScheduleTab';
+import StudioTab from './views/StudioTab';
 import ExpensesTab from './views/ExpensesTab';
 import PortfolioTab from './views/PortfolioTab';
 import CirclesTab from './views/CirclesTab';
@@ -62,8 +63,12 @@ function AppContent() {
             element={session ? <DashboardTab /> : <Navigate to="/login" replace />}
           />
           <Route
+            path="/studio"
+            element={session ? <StudioTab /> : <Navigate to="/login" replace />}
+          />
+          <Route
             path="/schedule"
-            element={session ? <ScheduleTab /> : <Navigate to="/login" replace />}
+            element={<Navigate to="/studio" replace />}
           />
           <Route
             path="/expenses"
@@ -80,8 +85,9 @@ function AppContent() {
 
           {/* Legacy route redirects */}
           <Route path="/money"     element={<Navigate to="/expenses" replace />} />
-          <Route path="/morning"   element={<Navigate to="/schedule" replace />} />
-          <Route path="/tasks"     element={<Navigate to="/schedule" replace />} />
+          <Route path="/morning"   element={<Navigate to="/studio" replace />} />
+          <Route path="/tasks"     element={<Navigate to="/studio" replace />} />
+          <Route path="/today"     element={<Navigate to="/dashboard" replace />} />
           <Route path="/nutrition" element={<Navigate to="/dashboard" replace />} />
           <Route path="/"          element={<Navigate to={session ? "/dashboard" : "/login"} replace />} />
         </Routes>

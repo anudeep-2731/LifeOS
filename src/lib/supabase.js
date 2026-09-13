@@ -51,6 +51,37 @@ export const fetchUserProfileName = async () => {
   return cached?.value || 'User';
 };
 
+export const fetchUserProfileAvatar = async () => {
+  try {
+    const client = await getSupabase();
+    if (client) {
+      const { data: { session } } = await client.auth.getSession();
+      if (session?.user?.user_metadata?.avatar_url) {
+        return session.user.user_metadata.avatar_url;
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching user avatar:', err);
+  }
+  const cached = await db.settings.get('user_avatar_url');
+  return cached?.value || null;
+};
+
+export const updateUserProfileAvatar = async (imageBlobOrFile) => {
+  const avatarUrl = await uploadCirclePhoto(imageBlobOrFile);
+  const client = await getSupabase();
+  if (client) {
+    const { data: { session } } = await client.auth.getSession();
+    if (session?.user) {
+      await client.auth.updateUser({
+        data: { avatar_url: avatarUrl }
+      }).catch(console.error);
+    }
+  }
+  await db.settings.put({ key: 'user_avatar_url', value: avatarUrl });
+  return avatarUrl;
+};
+
 // ─── SQL Schema Generator Script ──────────────────────────────────────────────
 export const SUPABASE_SQL_SCHEMA = `-- Execute this SQL script in Supabase SQL Editor (https://supabase.com/dashboard/project/_/sql)
 
@@ -1094,17 +1125,21 @@ export const createCirclePost = async ({ circleId, photoUrl, caption, postType =
   if (!session?.user) throw new Error('User not authenticated');
   
   const userName = await fetchUserProfileName();
+  const userAvatar = await fetchUserProfileAvatar();
   
+  const payload = {
+    circle_id: circleId,
+    user_id: session.user.id,
+    user_name: userName,
+    user_avatar: userAvatar || null,
+    photo_url: photoUrl || null,
+    caption: caption || '',
+    post_type: postType
+  };
+
   const { data, error } = await client
     .from('circle_posts')
-    .insert([{
-      circle_id: circleId,
-      user_id: session.user.id,
-      user_name: userName,
-      photo_url: photoUrl || null,
-      caption: caption || '',
-      post_type: postType
-    }])
+    .insert([payload])
     .select()
     .single();
     
@@ -1116,17 +1151,49 @@ export const fetchCirclePosts = async (circleId) => {
   const client = await getSupabase();
   if (!client) return [];
   
-  const { data: posts, error: postsErr } = await client
-    .from('circle_posts')
-    .select('*, circle_reactions(*)')
-    .eq('circle_id', circleId)
-    .order('created_at', { ascending: false });
+  const [postsRes, membersRes] = await Promise.all([
+    client
+      .from('circle_posts')
+      .select('*, circle_reactions(*)')
+      .eq('circle_id', circleId)
+      .order('created_at', { ascending: false }),
+    client
+      .from('circle_members')
+      .select('user_id, user_name, display_name, avatar_url')
+      .eq('circle_id', circleId)
+  ]);
     
-  if (postsErr) {
-    console.error('Error fetching circle posts:', postsErr);
+  if (postsRes.error) {
+    console.error('Error fetching circle posts:', postsRes.error);
     return [];
   }
-  return posts || [];
+
+  const posts = postsRes.data || [];
+  const members = membersRes.data || [];
+  const memberMap = new Map();
+  members.forEach(m => memberMap.set(m.user_id, m));
+
+  const { data: { session } } = await client.auth.getSession();
+  const currentUserId = session?.user?.id;
+  const currentUserAvatar = session?.user?.user_metadata?.avatar_url;
+  const currentUserName = session?.user?.user_metadata?.display_name || session?.user?.user_metadata?.full_name;
+
+  return posts.map(p => {
+    const mem = memberMap.get(p.user_id);
+    let avatar = mem?.avatar_url || p.user_avatar;
+    let name = mem?.display_name || mem?.user_name || p.user_name;
+
+    if (p.user_id === currentUserId) {
+      if (currentUserAvatar) avatar = currentUserAvatar;
+      if (currentUserName) name = currentUserName;
+    }
+
+    return {
+      ...p,
+      user_name: name || p.user_name || 'Member',
+      user_avatar: avatar || null
+    };
+  });
 };
 
 export const toggleReaction = async ({ postId, emoji }) => {

@@ -2,17 +2,21 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Icon from '../ui/Icon';
 import Drawer from './Drawer';
-import StreakBadge from '../ui/StreakBadge';
-import { fetchUserProfileName } from '../../lib/supabase';
+import { fetchUserProfileName, fetchUserProfileAvatar } from '../../lib/supabase';
 
 export default function TopBar() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState(null);
 
   useEffect(() => {
     const loadProfile = async () => {
-      const name = await fetchUserProfileName();
+      const [name, avatar] = await Promise.all([
+        fetchUserProfileName(),
+        fetchUserProfileAvatar(),
+      ]);
       setUserName(name);
+      if (avatar) setAvatarUrl(avatar);
     };
     loadProfile();
   }, []);
@@ -38,14 +42,16 @@ export default function TopBar() {
         </div>
         
         <div className="flex items-center gap-2.5">
-          <StreakBadge count={5} compact={false} />
-          
           <button
             onClick={() => setDrawerOpen(true)}
-            className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-headline font-extrabold text-sm select-none hover:opacity-90 active:scale-95 transition-all shadow-xs flex items-center justify-center"
+            className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-primary-container text-white font-headline font-extrabold text-sm select-none hover:opacity-90 active:scale-95 transition-all shadow-xs flex items-center justify-center overflow-hidden border border-white/40 cursor-pointer"
             title={`Profile (${userName})`}
           >
-            {initialLetter}
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              initialLetter
+            )}
           </button>
         </div>
       </header>

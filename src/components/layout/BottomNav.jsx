@@ -2,28 +2,18 @@ import { NavLink, useMatch } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Icon from '../ui/Icon';
 
-const NAV_ITEMS_LEFT = [
-  { to: '/dashboard', icon: 'home', label: 'Home' },
-  { to: '/schedule', icon: 'calendar_month', label: 'Schedule' },
-];
-
-const NAV_ITEMS_RIGHT = [
-  { to: '/expenses', icon: 'receipt_long', label: 'Expenses' },
-  { to: '/portfolio', icon: 'account_balance', label: 'Portfolio' },
-];
-
-function NavigationItem({ to, icon, label }) {
+function NavTab({ to, icon, label }) {
   const isActive = !!useMatch(to);
 
   return (
     <NavLink to={to} className="flex flex-col items-center justify-center py-1 group flex-1">
       <motion.div
-        whileTap={{ scale: 0.9 }}
+        whileTap={{ scale: 0.92 }}
         className="flex flex-col items-center"
       >
         {/* Icon container with active pill indicator */}
         <div
-          className={`px-3 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${
+          className={`px-4 py-1 rounded-full transition-all duration-200 flex items-center justify-center ${
             isActive
               ? 'bg-[#d1e4ff] text-[#001c39] shadow-xs'
               : 'text-[#44474e] group-hover:bg-surface-container-high'
@@ -32,9 +22,9 @@ function NavigationItem({ to, icon, label }) {
           <Icon name={icon} size={22} filled={isActive} />
         </div>
 
-        {/* Label ALWAYS BELOW the icon */}
+        {/* Label */}
         <span
-          className={`text-[10px] font-headline tracking-tight mt-0.5 transition-colors ${
+          className={`text-[11px] font-headline tracking-tight mt-0.5 transition-colors ${
             isActive
               ? 'text-[#001c39] font-extrabold'
               : 'text-[#44474e] font-semibold group-hover:text-on-surface'
@@ -53,7 +43,7 @@ function CenterCirclesItem() {
   return (
     <NavLink
       to="/circles"
-      className="relative -top-5 flex flex-col items-center justify-center group flex-shrink-0 px-2"
+      className="relative -top-5 flex flex-col items-center justify-center group flex-shrink-0 px-4"
     >
       <motion.div
         whileTap={{ scale: 0.92 }}
@@ -65,7 +55,7 @@ function CenterCirclesItem() {
       >
         <Icon name="groups" size={26} filled={isActive} />
         
-        {/* Unread Activity Pulsing Dot */}
+        {/* Activity Indicator Dot */}
         <span className="absolute top-1 right-1 flex h-3.5 w-3.5">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-pink-400 opacity-75"></span>
           <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-pink-500 border-2 border-slate-900"></span>
@@ -73,7 +63,7 @@ function CenterCirclesItem() {
       </motion.div>
 
       <span
-        className={`text-[10px] font-headline tracking-tight mt-1 transition-colors ${
+        className={`text-[11px] font-headline tracking-tight mt-1 transition-colors ${
           isActive ? 'text-primary font-black' : 'text-on-surface-variant font-bold'
         }`}
       >
@@ -85,10 +75,15 @@ function CenterCirclesItem() {
 
 export default function BottomNav() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 w-full flex justify-around items-center px-1 pb-2 pt-1.5 bg-[#f8f9ff]/95 backdrop-blur-xl z-50 rounded-t-[2rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20">
-      {NAV_ITEMS_LEFT.map(item => <NavigationItem key={item.to} {...item} />)}
+    <nav className="fixed bottom-0 left-0 right-0 w-full flex justify-around items-center px-4 pb-2 pt-1.5 bg-[#f8f9ff]/95 backdrop-blur-xl z-50 rounded-t-[2rem] shadow-[0_-12px_32px_rgba(0,93,167,0.08)] border-t border-outline-variant/20 max-w-xl mx-auto md:max-w-2xl">
+      {/* 1. Today */}
+      <NavTab to="/dashboard" icon="today" label="Today" />
+
+      {/* 2. Circles (Center) */}
       <CenterCirclesItem />
-      {NAV_ITEMS_RIGHT.map(item => <NavigationItem key={item.to} {...item} />)}
+
+      {/* 3. Money */}
+      <NavTab to="/expenses" icon="payments" label="Money" />
     </nav>
   );
 }
