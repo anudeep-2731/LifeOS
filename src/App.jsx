@@ -73,7 +73,10 @@ function AppContent() {
       {!isAuthPage && session && <TopBar />}
       <main className={!isAuthPage && session ? 'pt-16 pb-32' : ''}>
         <Routes>
-          <Route path="/login" element={<AuthView onAuthSuccess={() => {}} />} />
+          <Route
+            path="/login"
+            element={session ? <Navigate to="/dashboard" replace /> : <AuthView onAuthSuccess={() => {}} />}
+          />
 
           <Route
             path="/dashboard"
