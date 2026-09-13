@@ -88,17 +88,20 @@ export default function DashboardTab() {
     return new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   }, []);
 
-  // Safe to Spend Calculation
-  const { safeToSpendToday, isOnTrack } = useMemo(() => {
+  // Financial Overview Calculation
+  const { safeToSpendToday, remainingBudget, monthBurnPercent, isOnTrack } = useMemo(() => {
     const now = new Date();
     const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const currentDay = now.getDate();
     const daysRemaining = Math.max(1, totalDays - currentDay + 1);
-    const remainingBudget = Math.max(0, monthlyBudget - monthSpent);
-    const safe = Math.round(remainingBudget / daysRemaining);
+    const remBudget = Math.max(0, monthlyBudget - monthSpent);
+    const safe = Math.round(remBudget / daysRemaining);
+    const burn = monthlyBudget > 0 ? Math.min(100, Math.round((monthSpent / monthlyBudget) * 100)) : 0;
     return {
       safeToSpendToday: safe,
-      isOnTrack: todaySpent <= safe || safe > 0
+      remainingBudget: remBudget,
+      monthBurnPercent: burn,
+      isOnTrack: monthSpent <= monthlyBudget
     };
   }, [monthlyBudget, monthSpent, todaySpent]);
 
@@ -310,36 +313,76 @@ export default function DashboardTab() {
               </div>
             </div>
 
-            {/* Safe to Spend Tactical Micro-Bar */}
+            {/* Tactical Monthly & Daily Financial Card */}
             <div 
               onClick={() => navigate('/expenses')}
-              className="flex items-center justify-between px-4 py-2.5 bg-surface-container-low hover:bg-surface-container rounded-2xl cursor-pointer transition-colors group border border-outline-variant/20 shadow-xs"
+              className="flex flex-col gap-2.5 p-3.5 sm:p-4 bg-surface-container-low hover:bg-surface-container rounded-2xl cursor-pointer transition-all group border border-outline-variant/20 shadow-xs"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <span className={cn(
-                  "w-2.5 h-2.5 rounded-full shrink-0",
-                  isOnTrack ? "bg-secondary animate-pulse" : "bg-error animate-pulse"
-                )}></span>
-                <div className="flex items-baseline gap-1.5 truncate">
-                  <span className="font-mono text-sm sm:text-base font-bold text-on-surface">
-                    {formatINR(safeToSpendToday)}
+              {/* Header row */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={cn(
+                    "w-2.5 h-2.5 rounded-full shrink-0",
+                    isOnTrack ? "bg-secondary animate-pulse" : "bg-error animate-pulse"
+                  )}></span>
+                  <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
+                    Monthly Cashflow &amp; Daily Budget
                   </span>
-                  <span className="text-xs text-on-surface-variant truncate">
-                    safe to spend today · {formatINR(todaySpent)} spent
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className={cn(
+                    "px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-tight",
+                    isOnTrack 
+                      ? "bg-secondary-container/50 text-on-secondary-container" 
+                      : "bg-error-container/60 text-on-error-container"
+                  )}>
+                    {isOnTrack ? 'On Track ✓' : 'Budget Warning'}
                   </span>
+                  <Icon name="arrow_forward" size={14} className="text-on-surface-variant group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                <span className={cn(
-                  "px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-tight shrink-0",
-                  isOnTrack 
-                    ? "bg-secondary-container/50 text-on-secondary-container" 
-                    : "bg-error-container/60 text-on-error-container"
-                )}>
-                  {isOnTrack ? 'On Track' : 'Budget Warning'}
-                </span>
-                <Icon name="arrow_forward" size={14} className="text-on-surface-variant group-hover:translate-x-0.5 transition-transform" />
+              {/* 3 Metric Columns */}
+              <div className="grid grid-cols-3 divide-x divide-outline-variant/20 pt-1 text-center">
+                {/* 1. Total Spent This Month */}
+                <div className="flex flex-col items-center px-1">
+                  <span className="text-[10px] uppercase tracking-wider text-outline font-bold truncate max-w-full">
+                    SPENT THIS MONTH
+                  </span>
+                  <span className="font-mono text-xs sm:text-sm font-bold text-on-surface mt-0.5">
+                    {formatINR(monthSpent)}
+                  </span>
+                  <span className="text-[10px] text-on-surface-variant truncate mt-0.5">
+                    of {formatINR(monthlyBudget)}
+                  </span>
+                </div>
+
+                {/* 2. Remaining */}
+                <div className="flex flex-col items-center px-1">
+                  <span className="text-[10px] uppercase tracking-wider text-outline font-bold truncate max-w-full">
+                    REMAINING
+                  </span>
+                  <span className="font-mono text-xs sm:text-sm font-bold text-secondary mt-0.5">
+                    {formatINR(remainingBudget)}
+                  </span>
+                  <span className="text-[10px] text-on-surface-variant truncate mt-0.5">
+                    {Math.max(0, 100 - monthBurnPercent)}% left
+                  </span>
+                </div>
+
+                {/* 3. Today's Budget */}
+                <div className="flex flex-col items-center px-1">
+                  <span className="text-[10px] uppercase tracking-wider text-outline font-bold truncate max-w-full">
+                    TODAY'S BUDGET
+                  </span>
+                  <span className="font-mono text-xs sm:text-sm font-bold text-primary mt-0.5">
+                    {formatINR(safeToSpendToday)}
+                  </span>
+                  <span className="text-[10px] text-on-surface-variant truncate mt-0.5">
+                    {formatINR(todaySpent)} spent
+                  </span>
+                </div>
               </div>
             </div>
           </section>
