@@ -20,7 +20,7 @@ function EmojiBurst({ emoji, onDone }) {
   );
 }
 
-export default function CirclePostCard({ post, currentUserId, onPostUpdated }) {
+export default function CirclePostCard({ post, currentUserId, onPostUpdated, circleName = 'Squad' }) {
   const [isEditing, setIsEditing] = useState(false);
   const [caption, setCaption] = useState(post.caption || '');
   const [loading, setLoading] = useState(false);
@@ -204,7 +204,7 @@ export default function CirclePostCard({ post, currentUserId, onPostUpdated }) {
                 ) : isTaskCompletion ? (
                   <>🏆 {categoryTag || 'Task Accomplishment'}</>
                 ) : (
-                  <>Titan Squad · Verified 🏃</>
+                  <>{circleName} · Verified 🏃</>
                 )}
               </span>
             </div>

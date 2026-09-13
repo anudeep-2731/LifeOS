@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../ui/Icon';
 import { db } from '../../db/database';
 import FinanceSettingsSheet from '../ui/FinanceSettingsSheet';
+import ImageCropperModal from '../ui/ImageCropperModal';
 import { getSupabase, fetchUserProfileAvatar, updateUserProfileAvatar } from '../../lib/supabase';
 import { compressImage } from '../../lib/imageUtils';
 
@@ -13,6 +14,8 @@ export default function Drawer({ isOpen, onClose }) {
   const [user, setUser] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedRawFile, setSelectedRawFile] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
 
   const fileInputRef = useRef(null);
   const navigate = useNavigate();
@@ -45,13 +48,20 @@ export default function Drawer({ isOpen, onClose }) {
     if (isOpen) loadUser();
   }, [isOpen]);
 
-  const handleFileChange = async (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedRawFile(file);
+    setShowCropper(true);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
+  const handleCropComplete = async (croppedBlob) => {
+    setShowCropper(false);
+    setSelectedRawFile(null);
     setUploading(true);
     try {
-      const compressed = await compressImage(file);
+      const compressed = await compressImage(croppedBlob);
       const newAvatarUrl = await updateUserProfileAvatar(compressed);
       setAvatarUrl(newAvatarUrl);
     } catch (err) {
@@ -226,6 +236,19 @@ export default function Drawer({ isOpen, onClose }) {
       <FinanceSettingsSheet
         isOpen={showFinanceSettings}
         onClose={() => setShowFinanceSettings(false)}
+      />
+
+      <ImageCropperModal
+        isOpen={showCropper}
+        imageFile={selectedRawFile}
+        onClose={() => {
+          setShowCropper(false);
+          setSelectedRawFile(null);
+        }}
+        onCropComplete={handleCropComplete}
+        aspectRatio={1}
+        circularCrop={true}
+        title="Crop Profile Picture"
       />
     </>
   );
