@@ -120,9 +120,9 @@ export default function ExpensesTab() {
     remainingMonthlyBudget,
     safeToSpendToday,
     targetDailySafe,
-    burnPercent,
+    monthBurnPercent,
+    remainingPercent,
     isOnTrack,
-    bufferPercent,
     dashOffset
   } = useMemo(() => {
     const totalMonth = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
@@ -139,15 +139,14 @@ export default function ExpensesTab() {
     const safeToday = Math.round(remBudget / daysRemaining);
     const targetDaily = Math.round(monthlyBudget / totalDaysInMonth);
 
-    // Radial Gauge
+    // Radial Gauge for Monthly Spend
     const radius = 88;
     const circumference = 2 * Math.PI * radius; // ~552.92
-    const totalDailyCapacity = Math.max(1, safeToday + totalToday);
-    const burn = Math.min(100, Math.round((totalToday / totalDailyCapacity) * 100));
-    const offset = circumference - (circumference * burn) / 100;
+    const monthBurn = monthlyBudget > 0 ? Math.min(100, Math.round((totalMonth / monthlyBudget) * 100)) : 0;
+    const offset = circumference - (circumference * monthBurn) / 100;
 
-    const onTrack = totalToday <= safeToday || safeToday > 0;
-    const buffer = safeToday > targetDaily ? Math.round(((safeToday - targetDaily) / targetDaily) * 100) : 0;
+    const onTrack = totalMonth <= monthlyBudget;
+    const remPercent = Math.max(0, 100 - monthBurn);
 
     return {
       monthSpent: totalMonth,
@@ -155,9 +154,9 @@ export default function ExpensesTab() {
       remainingMonthlyBudget: remBudget,
       safeToSpendToday: safeToday,
       targetDailySafe: targetDaily,
-      burnPercent: burn,
+      monthBurnPercent: monthBurn,
+      remainingPercent: remPercent,
       isOnTrack: onTrack,
-      bufferPercent: buffer,
       dashOffset: offset
     };
   }, [expenses, monthlyBudget, today]);
@@ -488,15 +487,15 @@ export default function ExpensesTab() {
               {/* Typography Inside Radial Ring */}
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
                 <span className="text-[10px] text-outline uppercase tracking-[0.14em] font-bold">
-                  AVAILABLE TODAY
+                  MONTHLY SPEND
                 </span>
                 <div className="mt-1 flex items-baseline justify-center">
                   <span className="font-headline text-3xl sm:text-4xl font-extrabold tracking-tight text-on-surface">
-                    ₹{safeToSpendToday.toLocaleString('en-IN')}
+                    ₹{monthSpent.toLocaleString('en-IN')}
                   </span>
                 </div>
                 <span className="text-[11px] text-on-surface-variant font-medium mt-0.5">
-                  of ₹{targetDailySafe.toLocaleString('en-IN')} daily cap
+                  of ₹{monthlyBudget.toLocaleString('en-IN')} budget ({monthBurnPercent}%)
                 </span>
               </div>
             </div>
@@ -510,18 +509,16 @@ export default function ExpensesTab() {
                   : "bg-error-container/60 text-error"
               )}>
                 <span className={cn("w-1.5 h-1.5 rounded-full", isOnTrack ? "bg-secondary" : "bg-error")}></span>
-                {isOnTrack ? 'Calm & On Track ✓' : 'Daily Cap Exceeded'}
+                {isOnTrack ? 'Calm & On Track ✓' : 'Over Monthly Budget'}
               </span>
 
-              {bufferPercent > 0 && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-fixed/60 text-primary text-xs font-semibold">
-                  <span>📈</span>
-                  +{bufferPercent}% Buffer
-                </span>
-              )}
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-fixed/60 text-primary text-xs font-semibold">
+                <span>💎</span>
+                ₹{remainingMonthlyBudget.toLocaleString('en-IN')} Left
+              </span>
             </div>
 
-            {/* Compact Horizontal 3-Column Footer */}
+            {/* Compact Horizontal 3-Column Footer with Daily Metrics */}
             <div className="w-full mt-4 pt-3 border-t border-outline-variant/15 grid grid-cols-3 divide-x divide-outline-variant/20 text-center">
               <div className="flex flex-col items-center px-1">
                 <span className="text-[10px] uppercase tracking-wider text-outline font-bold">SPENT TODAY</span>
@@ -530,15 +527,15 @@ export default function ExpensesTab() {
                 </span>
               </div>
               <div className="flex flex-col items-center px-1">
-                <span className="text-[10px] uppercase tracking-wider text-outline font-bold">REMAINING CAP</span>
+                <span className="text-[10px] uppercase tracking-wider text-outline font-bold">SAFE TODAY</span>
                 <span className="font-mono text-xs sm:text-sm font-bold text-primary mt-0.5">
                   ₹{safeToSpendToday.toLocaleString('en-IN')}
                 </span>
               </div>
               <div className="flex flex-col items-center px-1">
-                <span className="text-[10px] uppercase tracking-wider text-outline font-bold">MONTH ACCRUAL</span>
-                <span className="font-mono text-xs sm:text-sm font-bold text-on-surface mt-0.5">
-                  ₹{monthSpent.toLocaleString('en-IN')}
+                <span className="text-[10px] uppercase tracking-wider text-outline font-bold">REMAINING</span>
+                <span className="font-mono text-xs sm:text-sm font-bold text-secondary mt-0.5">
+                  ₹{remainingMonthlyBudget.toLocaleString('en-IN')}
                 </span>
               </div>
             </div>
