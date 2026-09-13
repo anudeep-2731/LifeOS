@@ -206,6 +206,25 @@ export default function Drawer({ isOpen, onClose }) {
             <Icon name="chevron_right" size={18} className="text-outline" />
           </button>
 
+          <button
+            onClick={() => {
+              onClose();
+              window.dispatchEvent(new CustomEvent('open-onboarding'));
+            }}
+            className="w-full p-3 rounded-2xl bg-surface-container-lowest hover:bg-surface-container-high transition-colors flex items-center justify-between text-left shadow-xs border border-outline-variant/15"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                <Icon name="auto_awesome" size={20} />
+              </div>
+              <div>
+                <p className="text-xs font-headline font-bold text-on-surface">LifeOS Tour & Budget</p>
+                <p className="text-[10px] text-outline">App overview & daily target budget</p>
+              </div>
+            </div>
+            <Icon name="chevron_right" size={18} className="text-outline" />
+          </button>
+
         </div>
 
         {/* Footer */}

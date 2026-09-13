@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon';
 import FinanceSettingsSheet from '../components/ui/FinanceSettingsSheet';
 import DatePickerModal from '../components/ui/DatePickerModal';
+import LogExpenseModal from '../components/finance/LogExpenseModal';
 import { cn } from '../lib/utils';
 import { db, getTodayStr, getMonthStr, seedTodayData, rolloverFinancials } from '../db/database';
 import { 
@@ -61,7 +62,6 @@ export default function ExpensesTab() {
   const [logCategory, setLogCategory] = useState('Food');
   const [logPaymentSource, setLogPaymentSource] = useState('HDFC Bank');
   const [logDate, setLogDate] = useState(today);
-  const [isSaving, setIsSaving] = useState(false);
 
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -246,48 +246,6 @@ export default function ExpensesTab() {
     setLogPaymentSource(exp.paymentSource || 'HDFC Bank');
     setLogDate(exp.date);
     setShowLogModal(true);
-  };
-
-  // Save Transaction
-  const handleSaveTransaction = async (e) => {
-    if (e) e.preventDefault();
-    const amount = Number(logAmount);
-    if (!amount || amount <= 0 || !logDescription.trim() || isSaving) return;
-
-    setIsSaving(true);
-    try {
-      const now = new Date();
-      const timestamp = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-
-      if (editingExpenseId) {
-        await updateCloudExpense(editingExpenseId, {
-          amount,
-          description: logDescription.trim(),
-          category: logCategory,
-          paymentSource: logPaymentSource,
-          date: logDate,
-          notes: ''
-        });
-      } else {
-        await addCloudExpense({
-          amount,
-          description: logDescription.trim(),
-          category: logCategory,
-          paymentSource: logPaymentSource,
-          date: logDate,
-          timestamp,
-          notes: ''
-        });
-        await adjustCloudHoldingBalance(logPaymentSource, -amount);
-      }
-
-      setShowLogModal(false);
-      await loadFinancialData();
-    } catch (err) {
-      console.error('Error saving transaction:', err);
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   // Delete Expense
@@ -818,121 +776,18 @@ export default function ExpensesTab() {
         </div>
       </main>
 
-      {/* Clean Direct Input Log Expense Modal */}
-      {showLogModal && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="w-full sm:max-w-md bg-surface-container-lowest rounded-t-[32px] sm:rounded-[32px] p-5 pb-10 sm:pb-5 shadow-2xl border border-outline-variant/25 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
-            {/* Sheet Handle */}
-            <div className="w-10 h-1 rounded-full bg-outline-variant mx-auto sm:hidden -mt-1"></div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-outline-variant/15 pb-2.5">
-              <h3 className="font-headline text-base sm:text-lg font-bold text-on-surface">
-                {editingExpenseId ? 'Edit Transaction' : 'Log Expense'}
-              </h3>
-              <button
-                onClick={() => setShowLogModal(false)}
-                className="w-8 h-8 rounded-full bg-surface-container flex items-center justify-center text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer"
-              >
-                <Icon name="close" size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveTransaction} className="flex flex-col gap-3.5">
-              {/* Amount Input */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Amount</label>
-                <div className="relative flex items-center">
-                  <span className="absolute left-3.5 text-lg font-bold text-primary font-mono">₹</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    step="any"
-                    value={logAmount}
-                    onChange={(e) => setLogAmount(e.target.value)}
-                    placeholder="0"
-                    autoFocus
-                    className="w-full h-13 pl-9 pr-4 rounded-2xl bg-surface-container-low text-primary font-mono text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest border border-outline-variant/20 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Category Grid - Boxes without scrollbar! */}
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Category</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {DEFAULT_CATEGORY_METADATA.map((cat) => {
-                    const isSelected = logCategory === cat.name;
-                    return (
-                      <button
-                        key={cat.name}
-                        type="button"
-                        onClick={() => setLogCategory(cat.name)}
-                        className={cn(
-                          "flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95",
-                          isSelected
-                            ? "bg-primary text-white border-primary shadow-xs ring-2 ring-primary/20 scale-[1.02]"
-                            : "bg-surface-container-low text-on-surface-variant border-outline-variant/15 hover:border-outline-variant/35 hover:bg-surface-container"
-                        )}
-                      >
-                        <span className="text-xl mb-0.5">{cat.emoji}</span>
-                        <span className="text-[11px] truncate max-w-full">{cat.name}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Description Input */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Description</label>
-                <input
-                  type="text"
-                  value={logDescription}
-                  onChange={(e) => setLogDescription(e.target.value)}
-                  placeholder="e.g. Sourdough Bakery, Metro recharge"
-                  className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest border border-outline-variant/20 transition-all"
-                />
-              </div>
-
-              {/* Payment Source & Date */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Payment Via</label>
-                  <select
-                    value={logPaymentSource}
-                    onChange={(e) => setLogPaymentSource(e.target.value)}
-                    className="w-full h-11 px-2.5 rounded-xl bg-surface-container-low text-on-surface text-xs font-semibold focus:outline-none border border-outline-variant/20"
-                  >
-                    {PAYMENT_SOURCES.map(src => (
-                      <option key={src} value={src}>{src}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Date</label>
-                  <input
-                    type="date"
-                    value={logDate}
-                    onChange={(e) => setLogDate(e.target.value)}
-                    className="w-full h-11 px-2.5 rounded-xl bg-surface-container-low text-on-surface text-xs font-mono focus:outline-none border border-outline-variant/20"
-                  />
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <button
-                type="submit"
-                disabled={!logAmount || Number(logAmount) <= 0 || !logDescription.trim() || isSaving}
-                className="w-full h-12 mt-1 rounded-2xl bg-primary hover:bg-primary/90 text-white font-headline font-bold text-xs sm:text-sm flex items-center justify-center shadow-md active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer"
-              >
-                {isSaving ? 'Saving...' : editingExpenseId ? 'Update Expense' : 'Save Expense'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Unified Log Expense Modal */}
+      <LogExpenseModal
+        isOpen={showLogModal}
+        onClose={() => setShowLogModal(false)}
+        initialAmount={logAmount}
+        initialDescription={logDescription}
+        initialCategory={logCategory}
+        initialPaymentSource={logPaymentSource}
+        initialDate={logDate}
+        editingExpenseId={editingExpenseId}
+        onExpenseSaved={loadFinancialData}
+      />
 
       {/* Date Picker Modal for Day Filtering */}
       <DatePickerModal

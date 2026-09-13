@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../components/ui/Icon';
 import QuickLoggerBar from '../components/ui/QuickLoggerBar';
+import CompletionCelebration, { triggerHapticCelebration } from '../components/ui/CompletionCelebration';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
 import { 
   fetchCloudExpenses, 
@@ -80,6 +81,7 @@ export default function DashboardTab() {
   // Completed Accordion
   const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false);
   const [showCompletedHabits, setShowCompletedHabits] = useState(false);
+  const [celebration, setCelebration] = useState(null);
 
   // Active vs Completed Habits
   const activeRoutines = useMemo(() => routines.filter(r => !r.completed), [routines]);
@@ -92,19 +94,11 @@ export default function DashboardTab() {
 
   // Financial Overview Calculation
   const { safeToSpendToday, remainingBudget, monthBurnPercent, isOnTrack } = useMemo(() => {
-    const now = new Date();
-    const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const currentDay = now.getDate();
-    const daysRemaining = Math.max(1, totalDays - currentDay + 1);
-    const remBudget = Math.max(0, monthlyBudget - monthSpent);
-    const safe = Math.round(remBudget / daysRemaining);
+    const dailySafe = Math.max(0, 1000 - todaySpent);
+    const rem = Math.max(0, monthlyBudget - monthSpent);
     const burn = monthlyBudget > 0 ? Math.min(100, Math.round((monthSpent / monthlyBudget) * 100)) : 0;
-    return {
-      safeToSpendToday: safe,
-      remainingBudget: remBudget,
-      monthBurnPercent: burn,
-      isOnTrack: monthSpent <= monthlyBudget
-    };
+    const onTrack = burn <= 80;
+    return { safeToSpendToday: dailySafe, remainingBudget: rem, monthBurnPercent: burn, isOnTrack: onTrack };
   }, [monthlyBudget, monthSpent, todaySpent]);
 
   // Load All Cockpit Data
@@ -201,6 +195,10 @@ export default function DashboardTab() {
   // Toggle Habit
   const handleToggleHabit = async (habit) => {
     const nextCompleted = !habit.completed;
+    if (nextCompleted) {
+      triggerHapticCelebration();
+      setCelebration({ id: Date.now(), title: habit.title, type: 'habit' });
+    }
     // Optimistic UI update
     setRoutines(prev => prev.map(r => r.id === habit.id ? { ...r, completed: nextCompleted } : r));
 
@@ -217,6 +215,10 @@ export default function DashboardTab() {
   // Toggle Task
   const handleToggleTask = async (task) => {
     const nextCompleted = !task.completed;
+    if (nextCompleted) {
+      triggerHapticCelebration();
+      setCelebration({ id: Date.now(), title: task.title, type: 'task' });
+    }
     // Optimistic UI update
     setTasks(prev => prev.map(t => t.id === task.id ? { ...t, completed: nextCompleted } : t));
 
@@ -726,7 +728,8 @@ export default function DashboardTab() {
                   Syncing tasks...
                 </div>
               ) : activeTasks.length === 0 ? (
-                <div className="p-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 text-center space-y-1">
+                <div className="p-4 bg-secondary/10 border border-secondary/20 rounded-2xl flex flex-col items-center justify-center text-center gap-1.5 py-6">
+                  <span className="text-2xl">✨</span>
                   <p className="font-headline font-bold text-xs text-secondary">
                     No Pending Tasks
                   </p>
@@ -735,53 +738,62 @@ export default function DashboardTab() {
                   </p>
                 </div>
               ) : (
-                activeTasks.map((task) => {
-                  const priority = (task.priority || 'Medium').toLowerCase();
-                  const priorityDotClass = 
-                    priority === 'high' ? 'bg-error' :
-                    (priority === 'med' || priority === 'medium') ? 'bg-tertiary-container' :
-                    'bg-secondary';
+                <div className="flex flex-col gap-2.5">
+                  <AnimatePresence>
+                    {activeTasks.map((task) => {
+                      const priority = (task.priority || 'Medium').toLowerCase();
+                      const priorityDotClass = 
+                        priority === 'high' ? 'bg-error' :
+                        (priority === 'med' || priority === 'medium') ? 'bg-tertiary-container' :
+                        'bg-secondary';
 
-                  return (
-                    <div
-                      key={task.id}
-                      className="flex items-center justify-between p-3.5 bg-surface-container-lowest rounded-2xl shadow-xs border border-outline-variant/20 hover:border-outline-variant/40 hover:bg-surface-container-low/40 transition-all group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <button
-                          onClick={() => handleToggleTask(task)}
-                          className="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 text-transparent transition-all group-hover:bg-surface-container-high active:scale-95"
-                          title="Mark complete"
+                      return (
+                        <motion.div
+                          key={task.id}
+                          layout
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, x: 25, scale: 0.95 }}
+                          transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+                          className="flex items-center justify-between p-3.5 bg-surface-container-lowest rounded-2xl shadow-xs border border-outline-variant/20 hover:border-outline-variant/40 hover:bg-surface-container-low/40 transition-all group"
                         >
-                          <Icon name="check" size={16} className="text-on-surface-variant opacity-0 group-hover:opacity-70" />
-                        </button>
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <button
+                              onClick={() => handleToggleTask(task)}
+                              className="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center shrink-0 text-transparent transition-all group-hover:bg-surface-container-high active:scale-95 cursor-pointer"
+                              title="Mark complete"
+                            >
+                              <Icon name="check" size={16} className="text-on-surface-variant opacity-0 group-hover:opacity-70" />
+                            </button>
 
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-xs sm:text-sm font-medium text-on-surface truncate">
-                            {task.title}
-                          </span>
-                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="flex items-center gap-1 font-mono text-[11px] text-on-surface-variant">
-                              <Icon name="schedule" size={13} />
-                              {task.scheduledTime || task.time || 'Today'}
-                            </span>
-                            <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
-                            <span className="px-2 py-0.5 rounded-md bg-surface-container text-[10px] font-semibold text-on-surface-variant">
-                              {task.category || 'Work'}
-                            </span>
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="text-xs sm:text-sm font-medium text-on-surface truncate">
+                                {task.title}
+                              </span>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <span className="flex items-center gap-1 font-mono text-[11px] text-on-surface-variant">
+                                  <Icon name="schedule" size={13} />
+                                  {task.scheduledTime || task.time || 'Today'}
+                                </span>
+                                <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+                                <span className="px-2 py-0.5 rounded-md bg-surface-container text-[10px] font-semibold text-on-surface-variant">
+                                  {task.category || 'Work'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                        <span 
-                          className={cn("w-2.5 h-2.5 rounded-full shrink-0", priorityDotClass)} 
-                          title={`${task.priority || 'Medium'} Priority`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })
+                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            <span 
+                              className={cn("w-2.5 h-2.5 rounded-full shrink-0", priorityDotClass)} 
+                              title={`${task.priority || 'Medium'} Priority`}
+                            />
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
               )}
             </div>
 
@@ -843,6 +855,11 @@ export default function DashboardTab() {
 
         </div>
       </main>
+
+      <CompletionCelebration
+        celebration={celebration}
+        onDismiss={() => setCelebration(null)}
+      />
     </div>
   );
 }

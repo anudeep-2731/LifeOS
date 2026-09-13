@@ -9,12 +9,20 @@ import ExpensesTab from './views/ExpensesTab';
 import PortfolioTab from './views/PortfolioTab';
 import CirclesTab from './views/CirclesTab';
 import AuthView from './views/AuthView';
-import { getSupabase, migrateLocalDataToSupabase } from './lib/supabase';
+import OnboardingModal from './components/onboarding/OnboardingModal';
+import { getSupabase, migrateLocalDataToSupabase, fetchCloudSetting } from './lib/supabase';
 
 function AppContent() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    const handleOpenOnboarding = () => setShowOnboarding(true);
+    window.addEventListener('open-onboarding', handleOpenOnboarding);
+    return () => window.removeEventListener('open-onboarding', handleOpenOnboarding);
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -24,12 +32,21 @@ function AppContent() {
         setSession(currentSession);
         if (currentSession) {
           await migrateLocalDataToSupabase();
+          // Check onboarding
+          const hasOnboarded = await fetchCloudSetting('has_onboarded', false);
+          if (!hasOnboarded) {
+            setShowOnboarding(true);
+          }
         }
 
         const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, newSession) => {
           setSession(newSession);
           if (newSession) {
             await migrateLocalDataToSupabase();
+            const hasOnboarded = await fetchCloudSetting('has_onboarded', false);
+            if (!hasOnboarded) {
+              setShowOnboarding(true);
+            }
           }
         });
 
@@ -93,6 +110,15 @@ function AppContent() {
         </Routes>
       </main>
       {!isAuthPage && session && <BottomNav />}
+
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onClose={() => setShowOnboarding(false)}
+        onCompleted={() => {
+          setShowOnboarding(false);
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }
