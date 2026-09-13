@@ -1,0 +1,1360 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
+    <title>LifeOS // Mindful Awakening &amp; Kinetic Calibration</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&amp;family=Inter:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@500;600;700&amp;display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet">
+    <script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#005da7",
+                        "primary-container": "#2976c7",
+                        "primary-fixed": "#d4e3ff",
+                        "secondary": "#006d36",
+                        "secondary-container": "#83fba5",
+                        "tertiary": "#765700",
+                        "tertiary-container": "#fbbc00",
+                        "surface": "#f8f9ff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f0f4ff",
+                        "surface-container": "#e6eefe",
+                        "surface-container-high": "#dbe5f7",
+                        "on-surface": "#131c26",
+                        "on-surface-variant": "#414754",
+                        "outline": "#717786",
+                        "outline-variant": "#c2c8d6"
+                    },
+                    fontFamily: {
+                        headline: ['Plus Jakarta Sans', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    boxShadow: {
+                        'lifeos-card': '0 12px 32px rgba(0, 93, 167, 0.08), 0 2px 6px rgba(0, 20, 50, 0.04)',
+                        'glow-primary': '0 8px 28px -2px rgba(0, 93, 167, 0.42)',
+                        'glow-emerald': '0 8px 28px -2px rgba(0, 109, 54, 0.38)',
+                        'glow-amber': '0 8px 28px -2px rgba(251, 188, 0, 0.45)'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Mascot Animations */
+        @keyframes mascot-dance {
+            0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+            25% { transform: translateY(-8px) rotate(-3deg) scale(1.02, 0.98); }
+            50% { transform: translateY(0px) rotate(2deg) scale(0.98, 1.02); }
+            75% { transform: translateY(-11px) rotate(-1.5deg) scale(1.03, 0.97); }
+        }
+        .mascot-dance {
+            animation: mascot-dance 2.2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+            transform-origin: 50% 90%;
+        }
+
+        @keyframes mascot-wave-right {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-30deg); }
+            50% { transform: rotate(10deg); }
+            75% { transform: rotate(-36deg); }
+        }
+        .mascot-wave-arm-right {
+            animation: mascot-wave-right 1.1s ease-in-out infinite;
+            transform-origin: 75px 50px;
+        }
+
+        @keyframes mascot-wave-left {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(24deg); }
+            50% { transform: rotate(-8deg); }
+            75% { transform: rotate(30deg); }
+        }
+        .mascot-wave-arm-left {
+            animation: mascot-wave-left 1.3s ease-in-out infinite;
+            transform-origin: 25px 50px;
+        }
+
+        @keyframes mascot-blink {
+            0%, 88%, 100% { transform: scaleY(1); }
+            94% { transform: scaleY(0.08); }
+        }
+        .mascot-blinking {
+            animation: mascot-blink 3.4s ease-in-out infinite;
+            transform-origin: 50% 44px;
+        }
+
+        @keyframes mascot-sprout-sway {
+            0%, 100% { transform: rotate(0deg); }
+            30% { transform: rotate(12deg); }
+            70% { transform: rotate(-10deg); }
+        }
+        .mascot-sprout {
+            animation: mascot-sprout-sway 2.6s ease-in-out infinite;
+            transform-origin: 50px 24px;
+        }
+
+        /* Stage 0: Vertical Swipe Ignition Glow */
+        @keyframes pulse-core-target {
+            0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(0, 93, 167, 0.25); }
+            50% { transform: scale(1.06); box-shadow: 0 0 24px 6px rgba(41, 118, 199, 0.35); }
+        }
+        .pulse-target {
+            animation: pulse-core-target 2s ease-in-out infinite;
+        }
+
+        @keyframes float-orb {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-4px); }
+        }
+        .float-orb-idle {
+            animation: float-orb 1.8s ease-in-out infinite;
+        }
+
+        /* Stage 1: Rocket Launch Sequence */
+        @keyframes rocket-shot {
+            0% { transform: translateY(0) scale(1); opacity: 1; }
+            20% { transform: translateY(15px) scale(0.95); opacity: 1; }
+            100% { transform: translateY(-750px) scale(1.4); opacity: 1; }
+        }
+        .rocket-firing {
+            animation: rocket-shot 0.75s cubic-bezier(0.55, 0.05, 0.2, 1) forwards;
+        }
+
+        /* Stage 2: Sonar Radar Ping */
+        @keyframes radar-sweep {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .radar-sweep-beam {
+            animation: radar-sweep 2.8s linear infinite;
+            transform-origin: center;
+        }
+
+        @keyframes sonar-wave {
+            0% { transform: scale(0.2); opacity: 0.9; }
+            100% { transform: scale(2.4); opacity: 0; }
+        }
+        .sonar-pulse-ring {
+            animation: sonar-wave 1.4s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+
+        /* Scan Laser sweep down */
+        @keyframes scan-laser {
+            0% { top: -8px; opacity: 0; }
+            15% { opacity: 1; }
+            85% { opacity: 1; }
+            100% { top: 100%; opacity: 0; }
+        }
+        .laser-wipe-active {
+            animation: scan-laser 0.7s cubic-bezier(0.45, 0, 0.55, 1) forwards;
+        }
+
+        /* Stage 4: Hyperspace Warp Lines */
+        @keyframes warp-speed {
+            0% { transform: scale(0.1) rotate(0deg); opacity: 0; }
+            40% { opacity: 0.9; }
+            100% { transform: scale(3.5) rotate(45deg); opacity: 0; }
+        }
+        .warp-particle {
+            animation: warp-speed 0.8s ease-out forwards;
+        }
+    </style>
+</head>
+
+<body class="bg-[#eef3fb] text-on-surface font-body antialiased min-h-screen flex justify-center items-center select-none overflow-x-hidden">
+    <!-- Full-Screen Flash & Transition FX Overlays -->
+    <div class="fixed inset-0 z-50 pointer-events-none transition-opacity duration-300 bg-gradient-to-br from-[#005da7] via-[#2976c7] to-[#83fba5] opacity-0" id="screenFlashFX"></div>
+    <div class="fixed inset-x-0 h-1.5 bg-cyan-400 shadow-[0_0_20px_4px_#38bdf8] pointer-events-none z-50 hidden" id="laserScanFX"></div>
+    <div class="fixed inset-0 z-50 pointer-events-none bg-[#020b18] overflow-hidden items-center justify-center hidden" id="hyperspaceOverlay">
+        <div class="relative w-full h-full flex items-center justify-center">
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-96 h-96 rounded-full border-4 border-cyan-300/40 warp-particle"></div>
+                <div class="w-80 h-80 rounded-full border-2 border-white/60 warp-particle" style="animation-delay: 0.15s"></div>
+                <div class="w-64 h-64 rounded-full border-4 border-[#83fba5]/70 warp-particle" style="animation-delay: 0.3s"></div>
+                <div class="w-48 h-48 rounded-full border-2 border-cyan-200 warp-particle" style="animation-delay: 0.45s"></div>
+            </div>
+            <div class="text-center relative z-20 space-y-2 px-6">
+                <span class="material-symbols-outlined text-6xl text-cyan-300 animate-bounce">rocket_launch</span>
+                <h2 class="font-headline font-extrabold text-2xl tracking-wide text-white">LIFEOFF COMPLETE</h2>
+                <p class="font-mono text-xs text-cyan-200/80">WELCOME TO YOUR TODAY COCKPIT</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ambient Atmospheric Glows -->
+    <div class="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div class="absolute -top-24 -left-20 w-96 h-96 bg-primary/10 rounded-full blur-[110px]"></div>
+        <div class="absolute top-1/2 -right-24 w-96 h-96 bg-secondary/10 rounded-full blur-[120px]"></div>
+        <div class="absolute -bottom-24 left-1/3 w-80 h-80 bg-tertiary-container/15 rounded-full blur-[100px]"></div>
+    </div>
+
+    <!-- Main LifeOS Mobile Shell -->
+    <div class="relative z-10 w-full max-w-[420px] min-h-screen sm:min-h-[850px] sm:max-h-[890px] sm:my-6 sm:rounded-[40px] bg-surface border-0 sm:border sm:border-outline-variant/40 shadow-[0_20px_60px_-12px_rgba(0,40,90,0.12)] flex flex-col justify-between overflow-hidden" id="appContainer">
+        
+        <!-- FLOATING FEEDBACK TOAST -->
+        <div class="fixed top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none transition-all duration-300 transform opacity-0 -translate-y-3" id="xpToast">
+            <div class="px-4 py-2 rounded-full bg-white/95 border border-primary/25 backdrop-blur-xl text-primary font-mono text-xs font-bold tracking-tight shadow-lifeos-card flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-secondary animate-ping"></span>
+                <span id="xpToastText">✨ DISCIPLINE ENGINE READY</span>
+            </div>
+        </div>
+
+        <!-- TOP APP BAR / STAGES NAVIGATION -->
+        <div class="px-5 pt-4 pb-2 flex items-center justify-between z-20">
+            <!-- Stage Number Navigation Tabs -->
+            <div class="flex items-center gap-1.5 bg-surface-container-low/90 p-1 rounded-full border border-outline-variant/35 shadow-inner">
+                <button class="w-7 h-7 rounded-full font-mono text-[11px] font-bold transition-all flex items-center justify-center bg-primary text-white shadow-sm cursor-pointer" id="nav-btn-0" onclick="jumpToStage(0)">1</button>
+                <button class="w-7 h-7 rounded-full font-mono text-[11px] font-medium text-on-surface-variant hover:bg-surface-container transition-all flex items-center justify-center cursor-pointer" id="nav-btn-1" onclick="jumpToStage(1)">2</button>
+                <button class="w-7 h-7 rounded-full font-mono text-[11px] font-medium text-on-surface-variant hover:bg-surface-container transition-all flex items-center justify-center cursor-pointer" id="nav-btn-2" onclick="jumpToStage(2)">3</button>
+                <button class="w-7 h-7 rounded-full font-mono text-[11px] font-medium text-on-surface-variant hover:bg-surface-container transition-all flex items-center justify-center cursor-pointer" id="nav-btn-3" onclick="jumpToStage(3)">4</button>
+                <button class="w-7 h-7 rounded-full font-mono text-[11px] font-medium text-on-surface-variant hover:bg-surface-container transition-all flex items-center justify-center cursor-pointer" id="nav-btn-4" onclick="jumpToStage(4)">5</button>
+            </div>
+
+            <!-- Integrated Skip Button (no overlapping floating div) -->
+            <button onclick="skipToCockpit()" class="px-3 py-1 rounded-full bg-surface-container-low hover:bg-surface-container border border-outline-variant/35 text-on-surface-variant font-headline font-bold text-xs flex items-center gap-1 active:scale-95 transition-all cursor-pointer shadow-xs">
+                <span>Skip</span>
+                <span class="material-symbols-outlined text-sm">close</span>
+            </button>
+        </div>
+
+        <!-- CONTENT MAIN CONTAINER -->
+        <main class="flex-1 relative flex flex-col justify-center px-6 py-2 overflow-hidden">
+            
+            <!-- ========================================================================= -->
+            <!-- STAGE 0: MINDFUL AWAKENING & KINETIC SWIPE IGNITION -->
+            <!-- ========================================================================= -->
+            <section class="stage-section flex-col items-center justify-center text-center space-y-4 py-2 flex" id="stage-0">
+                <div class="space-y-1.5 max-w-xs">
+                    <!-- Dancing Lumi Mascot -->
+                    <div class="flex flex-col items-center justify-center mb-1">
+                        <div class="relative flex items-center justify-center cursor-pointer select-none" onclick="petLumi()">
+                            <div class="absolute w-24 h-24 rounded-full bg-primary/10 blur-xl pointer-events-none"></div>
+                            <div class="relative w-24 h-24 filter drop-shadow-md mascot-dance">
+                                <svg class="w-full h-full overflow-visible" viewBox="0 0 100 100">
+                                    <defs>
+                                        <radialGradient cx="40%" cy="35%" id="pipBody" r="60%">
+                                            <stop offset="0%" stop-color="#4f9cf8"></stop>
+                                            <stop offset="70%" stop-color="#005da7"></stop>
+                                            <stop offset="100%" stop-color="#003e73"></stop>
+                                        </radialGradient>
+                                        <radialGradient cx="50%" cy="40%" id="pipBelly" r="55%">
+                                            <stop offset="0%" stop-color="#ffffff"></stop>
+                                            <stop offset="100%" stop-color="#d4e3ff"></stop>
+                                        </radialGradient>
+                                    </defs>
+                                    <ellipse cx="50" cy="87" fill="#131c26" opacity="0.12" rx="24" ry="4.5"></ellipse>
+                                    <g class="mascot-feet">
+                                        <ellipse cx="36" cy="81" fill="#fbbc00" rx="7.5" ry="5"></ellipse>
+                                        <ellipse cx="64" cy="81" fill="#fbbc00" rx="7.5" ry="5"></ellipse>
+                                    </g>
+                                    <g class="mascot-sprout">
+                                        <path d="M50 25 C50 14 55 12 59 10 C57 16 53 18 50 22" fill="#83fba5" stroke="#006d36" stroke-linecap="round" stroke-width="1.2"></path>
+                                        <path d="M50 24 C46 13 41 12 37 11 C40 17 45 18 49 22" fill="#58d983" stroke="#006d36" stroke-linecap="round" stroke-width="1.2"></path>
+                                        <circle cx="50" cy="22" fill="#ffdcc3" r="2.5"></circle>
+                                    </g>
+                                    <rect fill="url(#pipBody)" height="56" rx="28" width="56" x="22" y="24"></rect>
+                                    <ellipse cx="50" cy="56" fill="url(#pipBelly)" rx="21" ry="18"></ellipse>
+                                    <ellipse cx="31" cy="55" fill="#ff8aa3" opacity="0.9" rx="4.5" ry="3"></ellipse>
+                                    <ellipse cx="69" cy="55" fill="#ff8aa3" opacity="0.9" rx="4.5" ry="3"></ellipse>
+                                    <g class="mascot-blinking">
+                                        <ellipse cx="39" cy="44" fill="#001a35" rx="5" ry="6.5"></ellipse>
+                                        <ellipse cx="61" cy="44" fill="#001a35" rx="5" ry="6.5"></ellipse>
+                                        <circle cx="37.5" cy="41.5" fill="#ffffff" r="2.2"></circle>
+                                        <circle cx="59.5" cy="41.5" fill="#ffffff" r="2.2"></circle>
+                                    </g>
+                                    <path d="M45 52 Q50 57 55 52" fill="#ba1a1a" stroke="#001a35" stroke-linecap="round" stroke-width="2.2"></path>
+                                    <g class="mascot-wave-arm-left">
+                                        <path d="M24 50 Q10 38 14 26" fill="none" stroke="url(#pipBody)" stroke-linecap="round" stroke-width="6"></path>
+                                        <circle cx="14" cy="25" fill="#ffdcc3" r="4.2"></circle>
+                                    </g>
+                                    <g class="mascot-wave-arm-right">
+                                        <path d="M76 50 Q90 38 86 26" fill="none" stroke="url(#pipBody)" stroke-linecap="round" stroke-width="6"></path>
+                                        <circle cx="86" cy="25" fill="#ffdcc3" r="4.2"></circle>
+                                    </g>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                    <h1 class="text-3xl font-extrabold font-headline tracking-tight text-on-surface leading-tight">
+                        Mindful <br><span class="text-primary font-headline">Awakening</span>
+                    </h1>
+                    <p class="text-xs text-on-surface-variant max-w-[285px] mx-auto leading-relaxed">
+                        Welcome to LifeOS — your daily sanctuary from distraction. Take a breath and swipe up to power your cockpit.
+                    </p>
+                </div>
+
+                <!-- KINETIC VERTICAL IGNITION TRACK -->
+                <div class="relative w-full py-1 flex flex-col items-center justify-center">
+                    <div class="relative w-20 h-56 rounded-full bg-surface-container-low border-2 border-outline-variant/50 p-2 shadow-inner flex flex-col justify-between items-center overflow-hidden touch-none cursor-pointer" id="swipeTrack">
+                        <!-- Top Target Receptor -->
+                        <div class="relative z-10 w-16 h-16 rounded-full bg-white border-2 border-primary/40 flex items-center justify-center shadow-md pulse-target transition-all duration-300" id="ignitionReceptor">
+                            <span class="material-symbols-outlined text-2xl text-primary" id="receptorIcon">bolt</span>
+                            <div class="absolute inset-0 rounded-full border-2 border-primary animate-ping opacity-25"></div>
+                        </div>
+                        <!-- Dynamic Electric Fill -->
+                        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-primary via-primary-container to-cyan-400 opacity-60 rounded-b-full transition-all duration-75" id="trackFillBar" style="height: 20%;"></div>
+                        <div class="flex flex-col items-center gap-1 pointer-events-none opacity-40 py-2">
+                            <span class="material-symbols-outlined text-xs text-primary animate-pulse">keyboard_arrow_up</span>
+                            <span class="material-symbols-outlined text-xs text-primary animate-pulse" style="animation-delay: 0.2s">keyboard_arrow_up</span>
+                        </div>
+                        <!-- Draggable Orb -->
+                        <div class="relative z-20 w-16 h-16 rounded-full bg-gradient-to-br from-[#2976c7] to-[#005da7] shadow-glow-primary flex items-center justify-center text-white cursor-grab active:cursor-grabbing active:scale-95 transition-transform touch-none select-none float-orb-idle" id="energyOrb">
+                            <div class="absolute inset-1 rounded-full border border-white/40"></div>
+                            <span class="material-symbols-outlined text-2xl drop-shadow">local_fire_department</span>
+                        </div>
+                    </div>
+                    <div class="space-y-1 mt-3">
+                        <p class="text-[11px] text-primary font-mono font-bold tracking-wider uppercase">SWIPE ORB UP TO IGNITE</p>
+                        <div class="flex justify-center items-center gap-1.5 text-xs text-secondary font-medium">
+                            <span class="inline-block w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
+                            <span>Intentional daily presence</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- STAGE 1: DAILY RITUALS & CUSTOM HABIT BUILDER -->
+            <!-- ========================================================================= -->
+            <section class="stage-section flex-col space-y-3 py-1 hidden" id="stage-1">
+                <!-- Mini Mascot Header -->
+                <div class="flex items-center justify-between pt-0.5 px-1">
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 cursor-pointer select-none filter drop-shadow-sm mascot-dance" onclick="petLumi()">
+                            <svg class="w-full h-full overflow-visible" viewBox="0 0 100 100">
+                                <rect fill="#005da7" height="56" rx="28" width="56" x="22" y="24"></rect>
+                                <ellipse cx="50" cy="56" fill="#d4e3ff" rx="20" ry="16"></ellipse>
+                                <ellipse cx="30" cy="54" fill="#ff8aa3" rx="4" ry="2.5"></ellipse>
+                                <ellipse cx="70" cy="54" fill="#ff8aa3" rx="4" ry="2.5"></ellipse>
+                                <g class="mascot-blinking">
+                                    <ellipse cx="39" cy="44" fill="#001a35" rx="4.5" ry="6"></ellipse>
+                                    <ellipse cx="61" cy="44" fill="#001a35" rx="4.5" ry="6"></ellipse>
+                                </g>
+                                <path d="M45 52 Q50 58 55 52" fill="#ba1a1a" stroke="#001a35" stroke-linecap="round" stroke-width="2"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <span class="text-[10px] font-mono text-primary font-bold uppercase tracking-wider">FOUNDATION PILLARS</span>
+                            <h2 class="text-xl font-extrabold font-headline text-on-surface tracking-tight leading-tight">
+                                Daily <span class="text-primary">Rituals</span>
+                            </h2>
+                        </div>
+                    </div>
+                    <!-- Quick Add Habit Click Button -->
+                    <button onclick="openCustomHabitModal()" class="px-3 py-1.5 rounded-full bg-primary-fixed hover:bg-primary hover:text-white text-primary text-xs font-headline font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer">
+                        <span class="material-symbols-outlined text-sm font-bold">add</span>
+                        <span>Add Habit</span>
+                    </button>
+                </div>
+
+                <p class="text-xs text-on-surface-variant px-1 leading-relaxed">
+                    Great discipline is compounded daily. Tap habits to activate them, or tap <strong class="text-primary">+ Add Habit</strong> to create your own.
+                </p>
+
+                <!-- Habit Cards Stack -->
+                <div class="relative space-y-2 pt-0.5" id="habitCardsContainer">
+                    <!-- Default Habit 1: Hydration -->
+                    <div class="habit-item relative z-10 p-3 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/30 hover:border-primary/50 shadow-lifeos-card transition-all duration-300 cursor-pointer select-none active:scale-[0.98]" id="habitCard1" onclick="activateHabitCard(1, 'Hydration Flow', 100, '#005da7')">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-primary-fixed text-primary flex items-center justify-center font-bold shadow-xs">
+                                    <span class="material-symbols-outlined text-lg">water_drop</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-headline font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5">
+                                        3L Hydration Flow
+                                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-primary-fixed text-primary font-bold">+100 XP</span>
+                                    </h3>
+                                    <p class="text-[10px] text-outline font-body">Mindful cellular replenishment</p>
+                                </div>
+                            </div>
+                            <div class="status-indicator w-6 h-6 rounded-full border border-outline-variant/50 bg-surface-container-low flex items-center justify-center transition-all">
+                                <span class="material-symbols-outlined text-xs font-bold text-primary opacity-0">check</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-1 rounded-full bg-surface-container-high overflow-hidden">
+                            <div class="h-full w-[35%] bg-primary rounded-full transition-all duration-500 card-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Default Habit 2: Breathwork -->
+                    <div class="habit-item relative z-10 p-3 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/30 hover:border-tertiary-container shadow-lifeos-card transition-all duration-300 cursor-pointer select-none active:scale-[0.98]" id="habitCard2" onclick="activateHabitCard(2, 'Morning Breathwork', 150, '#fbbc00')">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold shadow-xs">
+                                    <span class="material-symbols-outlined text-lg">self_improvement</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-headline font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5">
+                                        10m Morning Breathwork
+                                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-900 font-bold">+150 XP</span>
+                                    </h3>
+                                    <p class="text-[10px] text-outline font-body">Centering attention &amp; calm focus</p>
+                                </div>
+                            </div>
+                            <div class="status-indicator w-6 h-6 rounded-full border border-outline-variant/50 bg-surface-container-low flex items-center justify-center transition-all">
+                                <span class="material-symbols-outlined text-xs font-bold text-amber-600 opacity-0">check</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-1 rounded-full bg-surface-container-high overflow-hidden">
+                            <div class="h-full w-[45%] bg-[#fbbc00] rounded-full transition-all duration-500 card-bar"></div>
+                        </div>
+                    </div>
+
+                    <!-- Default Habit 3: Movement -->
+                    <div class="habit-item relative z-10 p-3 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/30 hover:border-secondary shadow-lifeos-card transition-all duration-300 cursor-pointer select-none active:scale-[0.98]" id="habitCard3" onclick="activateHabitCard(3, 'Kinetic Movement', 120, '#006d36')">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <div class="flex items-center gap-2.5">
+                                <div class="w-9 h-9 rounded-xl bg-emerald-100 text-secondary flex items-center justify-center font-bold shadow-xs">
+                                    <span class="material-symbols-outlined text-lg">directions_run</span>
+                                </div>
+                                <div>
+                                    <h3 class="font-headline font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5">
+                                        Kinetic Movement / Workout
+                                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-emerald-100 text-secondary font-bold">+120 XP</span>
+                                    </h3>
+                                    <p class="text-[10px] text-outline font-body">Cardio endurance &amp; daylight cadence</p>
+                                </div>
+                            </div>
+                            <div class="status-indicator w-6 h-6 rounded-full border border-outline-variant/50 bg-surface-container-low flex items-center justify-center transition-all">
+                                <span class="material-symbols-outlined text-xs font-bold text-secondary opacity-0">check</span>
+                            </div>
+                        </div>
+                        <div class="w-full h-1 rounded-full bg-surface-container-high overflow-hidden">
+                            <div class="h-full w-[50%] bg-secondary rounded-full transition-all duration-500 card-bar"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rocket Launch Chamber Footer -->
+                <div class="relative overflow-visible h-13 rounded-2xl bg-surface-container-low border border-outline-variant/40 flex items-center justify-between px-4 font-mono text-xs mt-1">
+                    <div class="flex items-center gap-2 text-[11px] text-on-surface-variant font-medium">
+                        <span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+                        <span id="habitsActivatedText">Tap 3 habits to fire launch sequence</span>
+                    </div>
+                    <div class="flex items-center gap-3 relative" id="rocketLaunchChamber">
+                        <div class="relative flex flex-col items-center" id="rocket1">
+                            <span class="material-symbols-outlined text-xl text-primary">rocket</span>
+                            <div class="w-2 h-4 bg-gradient-to-b from-primary to-transparent rounded-full opacity-0" id="smoke1"></div>
+                        </div>
+                        <div class="relative flex flex-col items-center" id="rocket2">
+                            <span class="material-symbols-outlined text-xl text-tertiary-container">rocket</span>
+                            <div class="w-2 h-4 bg-gradient-to-b from-[#fbbc00] to-transparent rounded-full opacity-0" id="smoke2"></div>
+                        </div>
+                        <div class="relative flex flex-col items-center" id="rocket3">
+                            <span class="material-symbols-outlined text-xl text-secondary">rocket</span>
+                            <div class="w-2 h-4 bg-gradient-to-b from-[#006d36] to-transparent rounded-full opacity-0" id="smoke3"></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- STAGE 2: ACCOUNTABILITY CIRCLES (PURE INFORMATION + ANIMATION) -->
+            <!-- ========================================================================= -->
+            <section class="stage-section flex-col space-y-3 py-1 hidden" id="stage-2">
+                <div class="space-y-1 text-center">
+                    <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-100 text-secondary font-mono text-[10px] font-bold tracking-wide">
+                        <span class="material-symbols-outlined text-xs">groups</span>
+                        <span>ACCOUNTABILITY SQUADS</span>
+                    </div>
+                    <h2 class="text-2xl font-extrabold font-headline text-on-surface tracking-tight">
+                        LifeOS <span class="text-primary">Circles</span>
+                    </h2>
+                    <p class="text-xs text-on-surface-variant max-w-[290px] mx-auto leading-relaxed">
+                        Peer accountability designed for radical consistency. Private groups where only real execution counts.
+                    </p>
+                </div>
+
+                <!-- INTERACTIVE SONAR RADAR VISUAL -->
+                <div class="relative w-52 h-52 mx-auto my-0.5 flex items-center justify-center">
+                    <div class="absolute inset-0 rounded-full border border-primary/20 bg-surface-container-low/60 shadow-lifeos-card"></div>
+                    <div class="absolute w-36 h-36 rounded-full border border-primary/30"></div>
+                    <div class="absolute w-20 h-20 rounded-full border border-primary/40"></div>
+                    <div class="absolute inset-x-0 top-1/2 h-[1px] bg-primary/20"></div>
+                    <div class="absolute inset-y-0 left-1/2 w-[1px] bg-primary/20"></div>
+                    <!-- Sweep Beam -->
+                    <div class="absolute inset-0 rounded-full radar-sweep-beam pointer-events-none" id="radarSweeper" style="background: conic-gradient(from 0deg, rgba(0, 93, 167, 0.25) 0deg, rgba(0, 93, 167, 0) 65deg);"></div>
+                    <div class="absolute w-20 h-20 rounded-full border-2 border-cyan-400 pointer-events-none opacity-0" id="sonarWaveRing"></div>
+
+                    <!-- Squad Blip 1 -->
+                    <div class="absolute top-6 left-8 flex flex-col items-center">
+                        <div class="w-7 h-7 rounded-full bg-primary-fixed border border-primary text-primary flex items-center justify-center font-mono text-[9px] font-bold shadow-md">
+                            <span>D1</span>
+                        </div>
+                        <span class="text-[8px] font-mono text-outline font-semibold">Dev</span>
+                        <div class="target-crosshair absolute -inset-1 border border-secondary rounded-full opacity-0 scale-150 transition-all duration-300"></div>
+                    </div>
+                    <!-- Squad Blip 2 -->
+                    <div class="absolute bottom-6 left-10 flex flex-col items-center">
+                        <div class="w-7 h-7 rounded-full bg-emerald-100 border border-secondary text-secondary flex items-center justify-center font-mono text-[9px] font-bold shadow-md">
+                            <span>M2</span>
+                        </div>
+                        <span class="text-[8px] font-mono text-outline font-semibold">Maya</span>
+                        <div class="target-crosshair absolute -inset-1 border border-secondary rounded-full opacity-0 scale-150 transition-all duration-300"></div>
+                    </div>
+                    <!-- Squad Blip 3 -->
+                    <div class="absolute top-10 right-7 flex flex-col items-center">
+                        <div class="w-7 h-7 rounded-full bg-amber-100 border border-tertiary-container text-tertiary flex items-center justify-center font-mono text-[9px] font-bold shadow-md">
+                            <span>K3</span>
+                        </div>
+                        <span class="text-[8px] font-mono text-outline font-semibold">Kael</span>
+                        <div class="target-crosshair absolute -inset-1 border border-secondary rounded-full opacity-0 scale-150 transition-all duration-300"></div>
+                    </div>
+
+                    <!-- Radar Ping Center Core Button -->
+                    <button class="relative z-20 w-14 h-14 rounded-full bg-primary hover:bg-primary-container text-white shadow-glow-primary flex flex-col items-center justify-center active:scale-95 transition-all select-none cursor-pointer group" id="radarCenterBtn" onclick="triggerSonarRadarPing()">
+                        <span class="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">wifi_tethering</span>
+                        <span class="text-[8px] font-mono tracking-wider font-bold">RADAR</span>
+                    </button>
+                </div>
+
+                <!-- 3 Clear Informational Pillar Cards -->
+                <div class="space-y-1.5 px-0.5">
+                    <div class="p-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 flex items-center gap-2.5 shadow-xs">
+                        <div class="w-8 h-8 rounded-xl bg-blue-50 text-primary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-base">photo_camera</span>
+                        </div>
+                        <div>
+                            <h4 class="font-headline font-bold text-xs text-on-surface">Camera-Verified Proof</h4>
+                            <p class="text-[10px] text-outline">Real-time live photo captures. No gallery uploads allowed.</p>
+                        </div>
+                    </div>
+
+                    <div class="p-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 flex items-center gap-2.5 shadow-xs">
+                        <div class="w-8 h-8 rounded-xl bg-emerald-50 text-secondary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-base">bar_chart</span>
+                        </div>
+                        <div>
+                            <h4 class="font-headline font-bold text-xs text-on-surface">Member Consistency Scorecard</h4>
+                            <p class="text-[10px] text-outline">Transparent weekly completion rates and squad streak multipliers.</p>
+                        </div>
+                    </div>
+
+                    <div class="p-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/30 flex items-center gap-2.5 shadow-xs">
+                        <div class="w-8 h-8 rounded-xl bg-amber-50 text-tertiary flex items-center justify-center shrink-0">
+                            <span class="material-symbols-outlined text-base">lock</span>
+                        </div>
+                        <div>
+                            <h4 class="font-headline font-bold text-xs text-on-surface">Zero Algorithms, 100% Privacy</h4>
+                            <p class="text-[10px] text-outline">No endless feeds or vanity metrics. Just you and your inner circle.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Continue Button -->
+                <button onclick="triggerSonarRadarPing()" class="w-full py-3 rounded-2xl bg-primary hover:bg-primary-container text-white font-headline font-bold text-xs shadow-glow-primary flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer mt-1">
+                    <span>Continue to Daily Budget</span>
+                    <span class="material-symbols-outlined text-base">arrow_forward</span>
+                </button>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- STAGE 3: MINDFUL DAILY BUDGET & PISTON DRAG + CUSTOM INPUT -->
+            <!-- ========================================================================= -->
+            <section class="stage-section flex-col space-y-3 py-1 hidden" id="stage-3">
+                <div class="flex items-center justify-between pt-0.5 px-1">
+                    <div>
+                        <span class="text-[10px] font-mono text-primary font-bold uppercase tracking-wider">FINANCIAL PEACE</span>
+                        <h2 class="text-xl font-extrabold font-headline text-on-surface tracking-tight leading-tight">
+                            Safe Daily <span class="text-primary">Budget</span>
+                        </h2>
+                    </div>
+                    <!-- Custom Budget Click Button -->
+                    <button onclick="openCustomBudgetModal()" class="px-3 py-1.5 rounded-full bg-primary-fixed hover:bg-primary hover:text-white text-primary text-xs font-headline font-bold flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer">
+                        <span class="material-symbols-outlined text-sm font-bold">edit</span>
+                        <span>Custom Amount</span>
+                    </button>
+                </div>
+
+                <p class="text-xs text-on-surface-variant px-1 leading-relaxed">
+                    Set your daily safe-to-spend target. Drag the liquid piston or select a preset below to lock your pace.
+                </p>
+
+                <!-- INTERACTIVE FUEL PISTON TUBE -->
+                <div class="relative w-full py-1 flex items-center justify-center gap-1.5">
+                    <!-- Hydraulic Clamps -->
+                    <div class="w-7 h-18 bg-gradient-to-r from-slate-400 to-slate-200 border-y-2 border-r-2 border-slate-600 rounded-r-xl shadow-md transition-all duration-300 pointer-events-none opacity-0 -translate-x-3 flex items-center justify-end pr-0.5" id="hydraulicClampLeft">
+                        <div class="w-1 h-10 bg-primary rounded-full"></div>
+                    </div>
+
+                    <!-- Vertical Tube -->
+                    <div class="relative w-32 h-44 rounded-3xl border-4 border-primary/30 bg-surface-container-lowest p-2 overflow-hidden shadow-lifeos-card cursor-ns-resize touch-none select-none shrink-0" id="fuelPistonCylinder">
+                        <div class="absolute inset-y-0 right-2.5 flex flex-col justify-between py-3 text-[9px] font-mono text-outline/70 pointer-events-none z-20 font-bold">
+                            <span>₹1,500</span>
+                            <span>₹1,000</span>
+                            <span>₹850</span>
+                            <span>₹500</span>
+                            <span>₹300</span>
+                        </div>
+                        <div class="w-full h-full rounded-2xl flex flex-col justify-end overflow-hidden relative bg-surface-container-low">
+                            <div class="w-full bg-gradient-to-t from-primary via-primary-container to-cyan-400 rounded-b-xl relative transition-all duration-75 shadow-[0_0_16px_rgba(0,93,167,0.5)]" id="tactileLiquid" style="height: 55%;">
+                                <div class="absolute -top-2.5 inset-x-0 h-5 bg-white/50 backdrop-blur-md rounded-full border border-white/70 flex items-center justify-center shadow-md">
+                                    <div class="w-7 h-0.5 bg-white rounded-full"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="w-7 h-18 bg-gradient-to-l from-slate-400 to-slate-200 border-y-2 border-l-2 border-slate-600 rounded-l-xl shadow-md transition-all duration-300 pointer-events-none opacity-0 translate-x-3 flex items-center justify-start pl-0.5" id="hydraulicClampRight">
+                        <div class="w-1 h-10 bg-primary rounded-full"></div>
+                    </div>
+                </div>
+
+                <!-- Readout Stats -->
+                <div class="grid grid-cols-2 gap-2.5 text-center px-1">
+                    <div class="p-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/40 shadow-xs">
+                        <div class="text-[9px] font-mono text-outline uppercase font-bold">Daily Safe Burn</div>
+                        <div class="text-lg font-mono font-bold text-primary" id="dailyBurnPistonVal">₹850 / day</div>
+                    </div>
+                    <div class="p-2.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/40 shadow-xs">
+                        <div class="text-[9px] font-mono text-outline uppercase font-bold">30-Day Reserve</div>
+                        <div class="text-lg font-mono font-bold text-secondary" id="monthlyReservePistonVal">₹25,500</div>
+                    </div>
+                </div>
+
+                <!-- Preset Chips -->
+                <div class="grid grid-cols-4 gap-1.5 px-1 pt-0.5">
+                    <button class="budget-chip py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/40 text-xs font-mono font-semibold text-on-surface transition-all active:scale-95" onclick="setPresetBudget(300, 25)">₹300</button>
+                    <button class="budget-chip py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/40 text-xs font-mono font-semibold text-on-surface transition-all active:scale-95" onclick="setPresetBudget(500, 42)">₹500</button>
+                    <button class="budget-chip active-chip py-1.5 rounded-xl bg-primary text-white border border-primary text-xs font-mono font-bold shadow-glow-primary transition-all active:scale-95" onclick="setPresetBudget(850, 55)">₹850</button>
+                    <button class="budget-chip py-1.5 rounded-xl bg-surface-container-lowest hover:bg-surface-container border border-outline-variant/40 text-xs font-mono font-semibold text-on-surface transition-all active:scale-95" onclick="setPresetBudget(1500, 95)">₹1,500</button>
+                </div>
+
+                <button onclick="lockBudgetAndContinue()" class="w-full py-3 rounded-2xl bg-primary hover:bg-primary-container text-white font-headline font-bold text-xs shadow-glow-primary flex items-center justify-center gap-2 active:scale-95 transition-all cursor-pointer mt-1">
+                    <span class="material-symbols-outlined text-base">lock</span>
+                    <span>Lock Daily Pace &amp; Review Pass</span>
+                </button>
+            </section>
+
+            <!-- ========================================================================= -->
+            <!-- STAGE 4: EXECUTIVE PASS & AEROSPACE THROTTLE SLIDER -->
+            <!-- ========================================================================= -->
+            <section class="stage-section flex-col space-y-3 py-1 hidden" id="stage-4">
+                <div class="space-y-1 text-center">
+                    <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-emerald-100 text-secondary font-mono text-[10px] font-bold tracking-wide">
+                        <span class="material-symbols-outlined text-xs">verified</span>
+                        <span>COCKPIT CALIBRATED</span>
+                    </div>
+                    <h2 class="text-2xl font-extrabold font-headline text-on-surface tracking-tight">
+                        LifeOS <span class="text-primary">Member Pass</span>
+                    </h2>
+                    <p class="text-xs text-on-surface-variant">Your daily routine and budget are locked. Push the throttle to enter.</p>
+                </div>
+
+                <!-- Membership Pass Card -->
+                <div class="p-4 rounded-3xl bg-surface-container-lowest border-2 border-outline-variant/40 shadow-lifeos-card relative overflow-hidden my-1">
+                    <div class="absolute -right-8 -top-8 w-32 h-32 bg-primary/15 rounded-full blur-2xl pointer-events-none"></div>
+                    <div class="flex items-start justify-between relative z-10">
+                        <div class="flex items-center gap-3">
+                            <div class="relative w-12 h-12 rounded-2xl bg-gradient-to-tr from-primary to-primary-container flex items-center justify-center text-white shadow-glow-primary">
+                                <span class="material-symbols-outlined text-2xl">shield_person</span>
+                                <span class="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-secondary border-2 border-white flex items-center justify-center">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white"></span>
+                                </span>
+                            </div>
+                            <div>
+                                <h3 class="font-headline font-bold text-base text-on-surface leading-tight">Anudeep</h3>
+                                <p class="text-[10px] font-mono text-primary font-bold tracking-tight">FOUNDING OPERATOR</p>
+                                <div class="flex items-center gap-1.5 mt-0.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-pulse"></span>
+                                    <span class="text-[10px] font-mono text-outline">Today Cockpit · Ready</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="w-11 h-11 rounded-2xl bg-primary-fixed border border-primary/30 flex flex-col items-center justify-center shadow-xs">
+                            <span class="text-[8px] font-mono text-primary uppercase font-extrabold tracking-wider">TIER</span>
+                            <span class="font-mono font-bold text-sm text-primary">01</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-surface-container-high text-center font-mono relative z-10">
+                        <div>
+                            <div class="text-[9px] text-outline font-medium uppercase">INITIAL XP</div>
+                            <div class="text-xs font-bold text-primary" id="finalXPDisplay">370 XP</div>
+                        </div>
+                        <div>
+                            <div class="text-[9px] text-outline font-medium uppercase">HABIT STACK</div>
+                            <div class="text-xs font-bold text-on-surface" id="finalHabitStackDisplay">3 Active</div>
+                        </div>
+                        <div>
+                            <div class="text-[9px] text-outline font-medium uppercase">DAILY PACE</div>
+                            <div class="text-xs font-bold text-primary" id="finalPaceDisplay">₹850</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- THROTTLE SLIDER -->
+                <div class="pt-1">
+                    <div class="flex justify-between items-center px-2 pb-1.5 text-[10px] font-mono text-outline font-bold">
+                        <span>THROTTLE: 0%</span>
+                        <span class="text-primary" id="throttlePercentText">SLIDE TO 100%</span>
+                    </div>
+                    <div class="relative w-full h-15 rounded-full bg-surface-container-high/80 border-2 border-outline-variant/50 p-1.5 flex items-center shadow-inner touch-none cursor-ew-resize overflow-hidden" id="throttleTrack">
+                        <div class="absolute left-0 top-0 bottom-0 bg-gradient-to-r from-primary via-primary-container to-cyan-400 rounded-full opacity-70 pointer-events-none transition-all duration-75" id="throttleFill" style="width: 15%;"></div>
+                        <div class="absolute inset-0 flex items-center justify-center text-xs font-headline font-bold text-on-surface tracking-wider pointer-events-none select-none">
+                            PUSH THROTTLE TO ENGAGE 🚀
+                        </div>
+                        <div class="relative z-20 w-13 h-12 rounded-full bg-white border-2 border-primary shadow-glow-primary flex items-center justify-center cursor-grab active:cursor-grabbing text-primary transition-transform touch-none" id="throttleKnob">
+                            <span class="material-symbols-outlined text-2xl font-bold">chevron_right</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- CUSTOM HABIT MODAL DIALOG -->
+    <!-- ========================================================================= -->
+    <div id="customHabitModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm items-center justify-center p-4 hidden">
+        <div class="bg-surface-container-lowest max-w-xs w-full p-5 rounded-3xl border border-outline-variant/30 shadow-2xl space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-lg">add_task</span>
+                    </div>
+                    <h3 class="font-headline font-bold text-sm text-on-surface">Add Custom Habit</h3>
+                </div>
+                <button onclick="closeCustomHabitModal()" class="text-outline hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-mono text-outline uppercase font-semibold mb-1">Habit Name</label>
+                <input type="text" id="customHabitInput" placeholder="e.g. Read 20 pages, Cold shower" class="w-full px-3 py-2 text-xs rounded-xl bg-surface-container-low border border-outline-variant/40 focus:border-primary focus:outline-none font-medium">
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-mono text-outline uppercase font-semibold mb-1">Category &amp; Icon</label>
+                <div class="grid grid-cols-4 gap-1.5 text-center" id="habitEmojiChips">
+                    <button type="button" class="emoji-chip p-2 rounded-xl border-2 border-primary bg-primary-fixed text-sm" onclick="selectHabitEmoji('📖', 'Reading', this)">📖</button>
+                    <button type="button" class="emoji-chip p-2 rounded-xl border border-outline-variant/30 bg-surface-container-low text-sm" onclick="selectHabitEmoji('💻', 'Deep Work', this)">💻</button>
+                    <button type="button" class="emoji-chip p-2 rounded-xl border border-outline-variant/30 bg-surface-container-low text-sm" onclick="selectHabitEmoji('🧘', 'Meditation', this)">🧘</button>
+                    <button type="button" class="emoji-chip p-2 rounded-xl border border-outline-variant/30 bg-surface-container-low text-sm" onclick="selectHabitEmoji('🥗', 'Nutrition', this)">🥗</button>
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-1">
+                <button onclick="closeCustomHabitModal()" class="px-3 py-2 rounded-xl text-xs font-headline font-bold text-outline hover:bg-surface-container transition-colors">Cancel</button>
+                <button onclick="saveCustomHabit()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-headline font-bold shadow-glow-primary transition-all">Save Habit</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- CUSTOM BUDGET MODAL DIALOG -->
+    <!-- ========================================================================= -->
+    <div id="customBudgetModal" class="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm items-center justify-center p-4 hidden">
+        <div class="bg-surface-container-lowest max-w-xs w-full p-5 rounded-3xl border border-outline-variant/30 shadow-2xl space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+                        <span class="material-symbols-outlined text-lg">account_balance_wallet</span>
+                    </div>
+                    <h3 class="font-headline font-bold text-sm text-on-surface">Custom Daily Budget</h3>
+                </div>
+                <button onclick="closeCustomBudgetModal()" class="text-outline hover:text-on-surface p-1">
+                    <span class="material-symbols-outlined text-lg">close</span>
+                </button>
+            </div>
+
+            <div>
+                <label class="block text-[10px] font-mono text-outline uppercase font-semibold mb-1">Target Daily Amount (₹)</label>
+                <div class="relative">
+                    <span class="absolute left-3 top-2.5 font-bold text-sm text-primary">₹</span>
+                    <input type="number" id="customBudgetInput" placeholder="750" class="w-full pl-7 pr-3 py-2 text-sm font-bold font-mono rounded-xl bg-surface-container-low border border-outline-variant/40 focus:border-primary focus:outline-none">
+                </div>
+                <p class="text-[10px] text-outline mt-1">Recommended: ₹300 to ₹3,000 / day</p>
+            </div>
+
+            <div class="flex items-center justify-end gap-2 pt-1">
+                <button onclick="closeCustomBudgetModal()" class="px-3 py-2 rounded-xl text-xs font-headline font-bold text-outline hover:bg-surface-container transition-colors">Cancel</button>
+                <button onclick="saveCustomBudget()" class="px-4 py-2 rounded-xl bg-primary hover:bg-primary-container text-white text-xs font-headline font-bold shadow-glow-primary transition-all">Set Budget</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================================= -->
+    <!-- JAVASCRIPT LOGIC & STATE ENGINES -->
+    <!-- ========================================================================= -->
+    <script>
+        const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioCtxClass();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playTone(freq = 520, duration = 0.2, type = 'sine', gainVal = 0.08) {
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(gainVal, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            } catch (e) { }
+        }
+
+        function playWhoosh() {
+            try {
+                initAudio();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(160, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(900, audioCtx.currentTime + 0.35);
+                gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.4);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.4);
+            } catch (e) { }
+        }
+
+        function playHydraulicClampSound() {
+            try {
+                initAudio();
+                playTone(180, 0.1, 'sawtooth', 0.15);
+                setTimeout(() => playTone(360, 0.2, 'sine', 0.1), 80);
+            } catch (e) { }
+        }
+
+        function playSuccessChord() {
+            try {
+                initAudio();
+                const freqs = [261.63, 329.63, 392.00, 523.25, 659.25];
+                freqs.forEach((f, i) => {
+                    setTimeout(() => playTone(f, 0.6, 'sine', 0.06), i * 60);
+                });
+            } catch (e) { }
+        }
+
+        function showXPToast(text) {
+            const toast = document.getElementById('xpToast');
+            const toastText = document.getElementById('xpToastText');
+            if (!toast || !toastText) return;
+            toastText.textContent = text;
+            toast.classList.remove('opacity-0', '-translate-y-3');
+            toast.classList.add('opacity-100', 'translate-y-0');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', '-translate-y-3');
+            }, 1700);
+        }
+
+        function petLumi() {
+            playTone(880, 0.25);
+            showXPToast('✨ LUMI BEAMS WITH JOY');
+        }
+
+        // Navigation
+        let currentStage = 0;
+        function jumpToStage(idx) {
+            playTone(550, 0.15);
+            currentStage = idx;
+            updateStageUI();
+        }
+        function nextStage(idx) {
+            currentStage = idx;
+            updateStageUI();
+        }
+
+        function updateStageUI() {
+            for (let i = 0; i <= 4; i++) {
+                const section = document.getElementById(`stage-${i}`);
+                const btn = document.getElementById(`nav-btn-${i}`);
+                if (section) {
+                    if (i === currentStage) {
+                        section.classList.remove('hidden');
+                        section.classList.add('flex');
+                    } else {
+                        section.classList.add('hidden');
+                        section.classList.remove('flex');
+                    }
+                }
+                if (btn) {
+                    if (i === currentStage) {
+                        btn.className = "w-6 h-6 rounded-full font-mono text-[10px] font-bold transition-all flex items-center justify-center bg-primary text-white shadow-sm";
+                    } else {
+                        btn.className = "w-6 h-6 rounded-full font-mono text-[10px] font-medium text-on-surface-variant hover:bg-surface-container transition-all flex items-center justify-center";
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // STAGE 0: KINETIC SWIPE-UP
+        // =========================================================================
+        const energyOrb = document.getElementById('energyOrb');
+        const trackFillBar = document.getElementById('trackFillBar');
+        const screenFlashFX = document.getElementById('screenFlashFX');
+
+        let isDraggingOrb = false;
+        let startY = 0;
+        let maxUpwardTravel = 135;
+
+        function getClientY(e) {
+            return e.touches ? e.touches[0].clientY : e.clientY;
+        }
+
+        function onOrbStart(e) {
+            e.preventDefault();
+            initAudio();
+            isDraggingOrb = true;
+            startY = getClientY(e);
+            energyOrb.classList.remove('float-orb-idle');
+        }
+
+        function onOrbMove(e) {
+            if (!isDraggingOrb) return;
+            const currentY = getClientY(e);
+            const deltaY = startY - currentY;
+            const currentTranslateY = Math.max(0, Math.min(deltaY, maxUpwardTravel));
+            energyOrb.style.transform = `translateY(-${currentTranslateY}px)`;
+            const progress = (currentTranslateY / maxUpwardTravel);
+            trackFillBar.style.height = `${20 + progress * 80}%`;
+
+            if (Math.random() > 0.6) {
+                playTone(300 + progress * 450, 0.05, 'sine', 0.03);
+            }
+
+            if (progress >= 0.96) {
+                isDraggingOrb = false;
+                detonateIgnition();
+            }
+        }
+
+        function onOrbEnd() {
+            if (!isDraggingOrb) return;
+            isDraggingOrb = false;
+            energyOrb.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1)';
+            energyOrb.style.transform = 'translateY(0px)';
+            trackFillBar.style.height = '20%';
+            setTimeout(() => {
+                energyOrb.style.transition = '';
+                energyOrb.classList.add('float-orb-idle');
+            }, 300);
+        }
+
+        function detonateIgnition() {
+            playWhoosh();
+            playTone(920, 0.4, 'sine', 0.15);
+            showXPToast('+250 INTENTION XP: IGNITION DETONATED');
+
+            screenFlashFX.classList.remove('opacity-0');
+            screenFlashFX.classList.add('opacity-100');
+
+            setTimeout(() => {
+                screenFlashFX.classList.remove('opacity-100');
+                screenFlashFX.classList.add('opacity-0');
+                nextStage(1);
+            }, 350);
+        }
+
+        energyOrb.addEventListener('mousedown', onOrbStart);
+        window.addEventListener('mousemove', onOrbMove);
+        window.addEventListener('mouseup', onOrbEnd);
+        energyOrb.addEventListener('touchstart', onOrbStart, { passive: false });
+        window.addEventListener('touchmove', onOrbMove, { passive: false });
+        window.addEventListener('touchend', onOrbEnd);
+
+        // =========================================================================
+        // STAGE 1: HABITS & CUSTOM HABIT LOGIC
+        // =========================================================================
+        const activatedHabits = new Set();
+        let customHabitsCount = 0;
+        let selectedCategoryEmoji = '📖';
+
+        function activateHabitCard(id, title, xp, color) {
+            if (activatedHabits.has(id)) return;
+            initAudio();
+            activatedHabits.add(id);
+            playTone(450 + id * 80, 0.25, 'sine', 0.1);
+            showXPToast(`+${xp} XP: ${title}`);
+
+            const card = document.getElementById(`habitCard${id}`);
+            if (card) {
+                card.style.borderColor = color;
+                card.classList.add('bg-blue-50/30');
+
+                const check = card.querySelector('.status-indicator');
+                if (check) {
+                    check.style.backgroundColor = color;
+                    check.style.borderColor = color;
+                    const icon = check.querySelector('span');
+                    if (icon) {
+                        icon.classList.remove('opacity-0');
+                        icon.classList.add('text-white');
+                    }
+                }
+
+                const bar = card.querySelector('.card-bar');
+                if (bar) bar.style.width = '100%';
+            }
+
+            const totalHabits = document.querySelectorAll('.habit-item').length;
+            document.getElementById('habitsActivatedText').textContent = `${activatedHabits.size} of ${totalHabits} habits activated`;
+
+            // If 3 or all habits activated, trigger rocket sequence
+            if (activatedHabits.size >= 3 || activatedHabits.size === totalHabits) {
+                document.getElementById('habitsActivatedText').innerHTML = '<span class="text-primary font-bold animate-pulse">🔥 CHAIN COMPLETE: LAUNCHING!</span>';
+                setTimeout(launchHabitRockets, 400);
+            }
+        }
+
+        function launchHabitRockets() {
+            playWhoosh();
+            playTone(320, 0.6, 'triangle', 0.15);
+
+            document.getElementById('smoke1').classList.remove('opacity-0');
+            document.getElementById('smoke2').classList.remove('opacity-0');
+            document.getElementById('smoke3').classList.remove('opacity-0');
+
+            document.getElementById('rocket1').classList.add('rocket-firing');
+            setTimeout(() => document.getElementById('rocket2').classList.add('rocket-firing'), 120);
+            setTimeout(() => document.getElementById('rocket3').classList.add('rocket-firing'), 240);
+
+            setTimeout(() => {
+                showXPToast('🚀 RITUALS ARMED // SQUAD SYNC READY');
+                nextStage(2);
+            }, 950);
+        }
+
+        // Custom Habit Modal Handlers
+        function openCustomHabitModal() {
+            document.getElementById('customHabitModal').classList.remove('hidden');
+            document.getElementById('customHabitModal').classList.add('flex');
+            document.getElementById('customHabitInput').focus();
+        }
+
+        function closeCustomHabitModal() {
+            document.getElementById('customHabitModal').classList.add('hidden');
+            document.getElementById('customHabitModal').classList.remove('flex');
+            document.getElementById('customHabitInput').value = '';
+        }
+
+        function selectHabitEmoji(emoji, label, btn) {
+            selectedCategoryEmoji = emoji;
+            document.querySelectorAll('#habitEmojiChips .emoji-chip').forEach(b => {
+                b.classList.remove('border-primary', 'bg-primary-fixed');
+                b.classList.add('border-outline-variant/30', 'bg-surface-container-low');
+            });
+            btn.classList.add('border-primary', 'bg-primary-fixed');
+            btn.classList.remove('border-outline-variant/30', 'bg-surface-container-low');
+        }
+
+        function saveCustomHabit() {
+            const title = document.getElementById('customHabitInput').value.trim();
+            if (!title) return;
+
+            customHabitsCount++;
+            const newId = 10 + customHabitsCount;
+
+            const container = document.getElementById('habitCardsContainer');
+            const newCard = document.createElement('div');
+            newCard.className = "habit-item relative z-10 p-3 rounded-2xl bg-surface-container-lowest border-2 border-outline-variant/30 hover:border-primary/50 shadow-lifeos-card transition-all duration-300 cursor-pointer select-none active:scale-[0.98]";
+            newCard.id = `habitCard${newId}`;
+            newCard.onclick = () => activateHabitCard(newId, title, 150, '#005da7');
+
+            newCard.innerHTML = `
+                <div class="flex items-center justify-between mb-1.5">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-9 h-9 rounded-xl bg-primary-fixed text-primary flex items-center justify-center font-bold shadow-xs text-base">
+                            ${selectedCategoryEmoji}
+                        </div>
+                        <div>
+                            <h3 class="font-headline font-bold text-xs sm:text-sm text-on-surface flex items-center gap-1.5">
+                                ${title}
+                                <span class="text-[9px] font-mono px-1.5 py-0.5 rounded-full bg-primary-fixed text-primary font-bold">+150 XP</span>
+                            </h3>
+                            <p class="text-[10px] text-outline font-body">Personalized daily discipline</p>
+                        </div>
+                    </div>
+                    <div class="status-indicator w-6 h-6 rounded-full border border-outline-variant/50 bg-surface-container-low flex items-center justify-center transition-all">
+                        <span class="material-symbols-outlined text-xs font-bold text-primary opacity-0">check</span>
+                    </div>
+                </div>
+                <div class="w-full h-1 rounded-full bg-surface-container-high overflow-hidden">
+                    <div class="h-full w-[25%] bg-primary rounded-full transition-all duration-500 card-bar"></div>
+                </div>
+            `;
+
+            container.appendChild(newCard);
+            closeCustomHabitModal();
+            showXPToast(`+ HABIT ADDED: ${title}`);
+            document.getElementById('finalHabitStackDisplay').textContent = `${document.querySelectorAll('.habit-item').length} Active`;
+        }
+
+        // =========================================================================
+        // STAGE 2: SONAR RADAR PING
+        // =========================================================================
+        let radarLocked = false;
+        function triggerSonarRadarPing() {
+            if (radarLocked) {
+                nextStage(3);
+                return;
+            }
+            initAudio();
+            radarLocked = true;
+            playTone(680, 0.4, 'sine', 0.15);
+
+            const wave = document.getElementById('sonarWaveRing');
+            wave.classList.remove('opacity-0');
+            wave.classList.add('sonar-pulse-ring');
+
+            setTimeout(() => {
+                document.querySelectorAll('.target-crosshair').forEach(ch => {
+                    ch.classList.remove('opacity-0', 'scale-150');
+                    ch.classList.add('opacity-100', 'scale-100');
+                });
+                showXPToast('✨ SQUAD CIRCLE SYNCHRONIZED');
+            }, 400);
+
+            setTimeout(() => {
+                const laser = document.getElementById('laserScanFX');
+                laser.classList.remove('hidden');
+                laser.classList.add('laser-wipe-active');
+                playWhoosh();
+            }, 700);
+
+            setTimeout(() => {
+                const laser = document.getElementById('laserScanFX');
+                laser.classList.add('hidden');
+                laser.classList.remove('laser-wipe-active');
+                nextStage(3);
+            }, 1300);
+        }
+
+        // =========================================================================
+        // STAGE 3: TACTILE FUEL PISTON & CUSTOM BUDGET
+        // =========================================================================
+        const pistonCylinder = document.getElementById('fuelPistonCylinder');
+        const tactileLiquid = document.getElementById('tactileLiquid');
+        const dailyBurnPistonVal = document.getElementById('dailyBurnPistonVal');
+        const monthlyReservePistonVal = document.getElementById('monthlyReservePistonVal');
+        const finalPaceDisplay = document.getElementById('finalPaceDisplay');
+        const hydraulicClampLeft = document.getElementById('hydraulicClampLeft');
+        const hydraulicClampRight = document.getElementById('hydraulicClampRight');
+
+        let isDraggingPiston = false;
+        let currentFuelAmount = 850;
+
+        function calculateFuelFromY(clientY) {
+            const rect = pistonCylinder.getBoundingClientRect();
+            const relativeY = clientY - rect.top;
+            const clampedY = Math.max(0, Math.min(relativeY, rect.height));
+            const percent = 1 - (clampedY / rect.height);
+            const rawVal = 300 + percent * (1500 - 300);
+            const rounded = Math.round(rawVal / 50) * 50;
+            return { rounded, percent: Math.max(15, Math.min(percent * 100, 95)) };
+        }
+
+        function updatePistonValues(amount, percent) {
+            currentFuelAmount = amount;
+            tactileLiquid.style.height = `${percent}%`;
+            dailyBurnPistonVal.textContent = `₹${amount.toLocaleString()} / day`;
+            monthlyReservePistonVal.textContent = `₹${(amount * 30).toLocaleString()}`;
+            if (finalPaceDisplay) finalPaceDisplay.textContent = `₹${amount.toLocaleString()}`;
+        }
+
+        function onPistonStart(e) {
+            e.preventDefault();
+            initAudio();
+            isDraggingPiston = true;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const { rounded, percent } = calculateFuelFromY(clientY);
+            updatePistonValues(rounded, percent);
+        }
+
+        function onPistonMove(e) {
+            if (!isDraggingPiston) return;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const { rounded, percent } = calculateFuelFromY(clientY);
+            updatePistonValues(rounded, percent);
+            if (Math.random() > 0.7) {
+                playTone(200 + rounded / 2, 0.04, 'sine', 0.02);
+            }
+        }
+
+        function onPistonEnd() {
+            if (!isDraggingPiston) return;
+            isDraggingPiston = false;
+            playHydraulicClampSound();
+            showXPToast(`PACE LOCKED: ₹${currentFuelAmount}/DAY`);
+        }
+
+        pistonCylinder.addEventListener('mousedown', onPistonStart);
+        window.addEventListener('mousemove', onPistonMove);
+        window.addEventListener('mouseup', onPistonEnd);
+        pistonCylinder.addEventListener('touchstart', onPistonStart, { passive: false });
+        window.addEventListener('touchmove', onPistonMove, { passive: false });
+        window.addEventListener('touchend', onPistonEnd);
+
+        function setPresetBudget(amount, percent) {
+            playTone(500 + amount / 3);
+            updatePistonValues(amount, percent);
+            document.querySelectorAll('.budget-chip').forEach(btn => {
+                btn.classList.remove('active-chip', 'bg-primary', 'text-white', 'shadow-glow-primary');
+                btn.classList.add('bg-surface-container-lowest', 'text-on-surface');
+            });
+            const clicked = window.event?.currentTarget;
+            if (clicked) {
+                clicked.classList.add('active-chip', 'bg-primary', 'text-white', 'shadow-glow-primary');
+                clicked.classList.remove('bg-surface-container-lowest', 'text-on-surface');
+            }
+            showXPToast(`BUDGET SET: ₹${amount}/DAY`);
+        }
+
+        function lockBudgetAndContinue() {
+            playHydraulicClampSound();
+            hydraulicClampLeft.classList.remove('opacity-0', '-translate-x-3');
+            hydraulicClampLeft.classList.add('opacity-100', 'translate-x-0');
+            hydraulicClampRight.classList.remove('opacity-0', 'translate-x-3');
+            hydraulicClampRight.classList.add('opacity-100', 'translate-x-0');
+
+            setTimeout(() => {
+                nextStage(4);
+            }, 600);
+        }
+
+        function skipToCockpit() {
+            playTone(450, 0.1);
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'LIFEOS_ONBOARDING_SKIP' }, '*');
+            }
+        }
+
+        // Custom Budget Modal Handlers
+        function openCustomBudgetModal() {
+            document.getElementById('customBudgetModal').classList.remove('hidden');
+            document.getElementById('customBudgetModal').classList.add('flex');
+            document.getElementById('customBudgetInput').value = currentFuelAmount;
+            document.getElementById('customBudgetInput').focus();
+        }
+
+        function closeCustomBudgetModal() {
+            document.getElementById('customBudgetModal').classList.add('hidden');
+            document.getElementById('customBudgetModal').classList.remove('flex');
+        }
+
+        function saveCustomBudget() {
+            const val = Number(document.getElementById('customBudgetInput').value);
+            if (!val || val <= 0) return;
+
+            const percent = Math.min(95, Math.max(15, Math.round((val / 1500) * 100)));
+            updatePistonValues(val, percent);
+
+            document.querySelectorAll('.budget-chip').forEach(btn => {
+                btn.classList.remove('active-chip', 'bg-primary', 'text-white', 'shadow-glow-primary');
+                btn.classList.add('bg-surface-container-lowest', 'text-on-surface');
+            });
+
+            closeCustomBudgetModal();
+            showXPToast(`CUSTOM DAILY BUDGET: ₹${val}`);
+        }
+
+        // =========================================================================
+        // STAGE 4: THROTTLE SLIDER & HYPERSPACE LIFTOFF
+        // =========================================================================
+        const throttleTrack = document.getElementById('throttleTrack');
+        const throttleKnob = document.getElementById('throttleKnob');
+        const throttleFill = document.getElementById('throttleFill');
+        const throttlePercentText = document.getElementById('throttlePercentText');
+        const hyperspaceOverlay = document.getElementById('hyperspaceOverlay');
+
+        let isDraggingThrottle = false;
+
+        function onThrottleStart(e) {
+            e.preventDefault();
+            initAudio();
+            isDraggingThrottle = true;
+        }
+
+        function onThrottleMove(e) {
+            if (!isDraggingThrottle) return;
+            const rect = throttleTrack.getBoundingClientRect();
+            const knobWidth = throttleKnob.offsetWidth;
+            const maxSlide = rect.width - knobWidth - 12;
+
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const deltaX = clientX - rect.left - knobWidth / 2;
+            const clampedX = Math.max(0, Math.min(deltaX, maxSlide));
+            const percent = Math.round((clampedX / maxSlide) * 100);
+
+            throttleKnob.style.transform = `translateX(${clampedX}px)`;
+            throttleFill.style.width = `${Math.max(15, percent)}%`;
+            throttlePercentText.textContent = `THROTTLE: ${percent}%`;
+
+            if (Math.random() > 0.6) {
+                playTone(300 + percent * 5, 0.05, 'triangle', 0.03);
+            }
+
+            if (percent >= 96) {
+                isDraggingThrottle = false;
+                engageHyperspaceWarp();
+            }
+        }
+
+        function onThrottleEnd() {
+            if (!isDraggingThrottle) return;
+            isDraggingThrottle = false;
+            throttleKnob.style.transition = 'transform 0.3s cubic-bezier(0.34, 1.3, 0.64, 1)';
+            throttleKnob.style.transform = 'translateX(0px)';
+            throttleFill.style.width = '15%';
+            throttlePercentText.textContent = 'SLIDE TO 100%';
+            setTimeout(() => {
+                throttleKnob.style.transition = '';
+            }, 300);
+        }
+
+        function engageHyperspaceWarp() {
+            playSuccessChord();
+            playWhoosh();
+            hyperspaceOverlay.classList.remove('hidden');
+            hyperspaceOverlay.classList.add('flex');
+
+            setTimeout(() => {
+                showXPToast('✨ COCKPIT ARMED // WELCOME TO LIFEOS');
+                if (window.parent && window.parent !== window) {
+                    window.parent.postMessage({
+                        type: 'LIFEOS_ONBOARDING_COMPLETE',
+                        dailyBudget: currentFuelAmount,
+                        monthlyBudget: currentFuelAmount * 30
+                    }, '*');
+                }
+            }, 1000);
+        }
+
+        throttleKnob.addEventListener('mousedown', onThrottleStart);
+        window.addEventListener('mousemove', onThrottleMove);
+        window.addEventListener('mouseup', onThrottleEnd);
+        throttleKnob.addEventListener('touchstart', onThrottleStart, { passive: false });
+        window.addEventListener('touchmove', onThrottleMove, { passive: false });
+        window.addEventListener('touchend', onThrottleEnd);
+    </script>
+</body>
+
+</html>
