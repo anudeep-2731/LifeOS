@@ -50,6 +50,7 @@ export default function ExpensesTab() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState(null);
+  const [expandedExpenseId, setExpandedExpenseId] = useState(null);
 
   // Expense Logger Sheet Modal State
   const [showLogModal, setShowLogModal] = useState(false);
@@ -325,138 +326,82 @@ export default function ExpensesTab() {
         <div className="flex flex-col w-full relative pb-6 gap-5">
 
           {/* Interactive Action Bar / Top Level Utility */}
-          <div className="flex flex-col gap-3 pt-2 relative">
-            <div className="flex items-center justify-between relative">
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-                  <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Live Cashflow
-                  </span>
-                </div>
-
-                {/* Month Picker Button */}
-                <div className="flex items-center gap-1 bg-surface-container rounded-full px-1.5 py-0.5 border border-outline-variant/15">
-                  <button
-                    onClick={handlePrevMonth}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-outline hover:text-on-surface cursor-pointer"
-                  >
-                    <Icon name="chevron_left" size={16} />
-                  </button>
-                  <span className="font-headline font-bold text-xs text-on-surface px-1">
-                    {formattedMonth}
-                  </span>
-                  <button
-                    onClick={handleNextMonth}
-                    disabled={selectedMonth >= currentMonthStr}
-                    className="w-6 h-6 rounded-full flex items-center justify-center text-outline hover:text-on-surface disabled:opacity-30 cursor-pointer"
-                  >
-                    <Icon name="chevron_right" size={16} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Utility Action Buttons */}
-              <div className="flex items-center gap-1.5">
-                {/* Date Picker Button */}
-                <button
-                  onClick={() => setSelectedDate(selectedDate ? null : today)}
-                  className={cn(
-                    "w-9 h-9 rounded-full flex items-center justify-center transition-all cursor-pointer",
-                    selectedDate 
-                      ? "bg-primary text-white shadow-xs" 
-                      : "bg-surface-container hover:bg-surface-container-high text-on-surface"
-                  )}
-                  title={selectedDate ? `Filtering by ${selectedDate} (Click to clear)` : 'Filter today'}
-                >
-                  <Icon name="calendar_today" size={18} />
-                </button>
-
-                {/* Options Menu Dropdown Trigger */}
-                <div className="relative">
-                  <button
-                    onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                    className="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors active:scale-95 text-on-surface cursor-pointer"
-                    title="Cashflow Options"
-                  >
-                    <Icon name="more_vert" size={18} />
-                  </button>
-
-                  {showMenuDropdown && (
-                    <div className="absolute right-0 mt-1 w-56 rounded-2xl bg-surface-container-lowest shadow-card border border-outline-variant/20 z-40 py-2 origin-top-right animate-fadeIn">
-                      <button
-                        onClick={() => {
-                          setShowMenuDropdown(false);
-                          navigate('/portfolio');
-                        }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                      >
-                        <span>💎</span>
-                        <span>Wealth Portfolio &amp; Holdings</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowMenuDropdown(false);
-                          downloadCSV(expenses, `lifeos-expenses-${selectedMonth}.csv`);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                      >
-                        <span>📤</span>
-                        <span>Export CSV</span>
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          setShowMenuDropdown(false);
-                          setShowSettings(true);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
-                      >
-                        <span>⚙️</span>
-                        <span>Edit Budget &amp; Envelopes</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
+          <div className="flex items-center justify-between pt-2">
+            {/* Month Picker Button */}
+            <div className="flex items-center gap-1 bg-surface-container rounded-full px-2 py-1 border border-outline-variant/20 shadow-xs">
+              <button
+                onClick={handlePrevMonth}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface transition-colors cursor-pointer"
+              >
+                <Icon name="chevron_left" size={18} />
+              </button>
+              <span className="font-headline font-bold text-xs sm:text-sm text-on-surface px-1.5">
+                {formattedMonth}
+              </span>
+              <button
+                onClick={handleNextMonth}
+                disabled={selectedMonth >= currentMonthStr}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-on-surface disabled:opacity-30 transition-colors cursor-pointer"
+              >
+                <Icon name="chevron_right" size={18} />
+              </button>
             </div>
 
-            {/* Horizontal 7-Day Precision Strip */}
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {/* Utility Action Buttons */}
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setSelectedDate(null)}
-                className={cn(
-                  "flex flex-col items-center justify-center py-2 px-3 rounded-2xl min-w-[56px] shrink-0 transition-all cursor-pointer",
-                  selectedDate === null
-                    ? "bg-primary text-white shadow-xs font-bold"
-                    : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
-                )}
+                onClick={() => navigate('/portfolio')}
+                className="px-3 py-1.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title="Holdings & Accounts"
               >
-                <span className="text-[10px] uppercase font-semibold opacity-80">ALL</span>
-                <span className="font-headline text-xs font-bold mt-0.5">Month</span>
+                <span>💎</span>
+                <span className="hidden sm:inline">Holdings</span>
               </button>
 
-              {weekStripDays.map((d) => {
-                const isSelected = selectedDate === d.dateStr;
+              <button
+                onClick={() => setShowSettings(true)}
+                className="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors text-on-surface cursor-pointer"
+                title="Budget Settings"
+              >
+                <Icon name="tune" size={18} />
+              </button>
 
-                return (
-                  <button
-                    key={d.dateStr}
-                    onClick={() => setSelectedDate(isSelected ? null : d.dateStr)}
-                    className={cn(
-                      "flex flex-col items-center justify-center py-2 px-3 rounded-2xl min-w-[50px] shrink-0 transition-all cursor-pointer",
-                      isSelected
-                        ? "bg-primary text-white shadow-xs font-bold scale-105"
-                        : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
-                    )}
-                  >
-                    <span className="text-[10px] uppercase font-semibold opacity-75">{d.name}</span>
-                    <span className="font-mono text-xs font-bold mt-0.5">{d.dayNum}</span>
-                    {d.isToday && <span className={cn("w-1 h-1 rounded-full mt-0.5", isSelected ? "bg-white" : "bg-primary")}></span>}
-                  </button>
-                );
-              })}
+              {/* Options Menu Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                  className="w-9 h-9 rounded-full flex items-center justify-center bg-surface-container hover:bg-surface-container-high transition-colors active:scale-95 text-on-surface cursor-pointer"
+                  title="More Options"
+                >
+                  <Icon name="more_vert" size={18} />
+                </button>
+
+                {showMenuDropdown && (
+                  <div className="absolute right-0 mt-1 w-56 rounded-2xl bg-surface-container-lowest shadow-card border border-outline-variant/20 z-40 py-2 origin-top-right animate-fadeIn">
+                    <button
+                      onClick={() => {
+                        setShowMenuDropdown(false);
+                        downloadCSV(expenses, `lifeos-expenses-${selectedMonth}.csv`);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                    >
+                      <span>📤</span>
+                      <span>Export CSV</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setShowMenuDropdown(false);
+                        setShowSettings(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left text-xs font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
+                    >
+                      <span>⚙️</span>
+                      <span>Edit Budget &amp; Envelopes</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -544,10 +489,10 @@ export default function ExpensesTab() {
           {/* Quick Log CTA Button */}
           <button
             onClick={openNewExpenseModal}
-            className="w-full h-13 rounded-2xl bg-gradient-to-r from-primary to-primary-container flex items-center justify-center gap-2 text-white shadow-md active:scale-[0.98] transition-transform cursor-pointer"
+            className="w-full h-14 sm:h-15 rounded-2xl bg-gradient-to-r from-primary to-primary-container flex items-center justify-center gap-2.5 text-white shadow-lg active:scale-[0.98] transition-all cursor-pointer hover:brightness-105"
           >
-            <Icon name="add" size={20} className="font-bold" />
-            <span className="font-headline text-sm sm:text-base font-bold tracking-tight">
+            <Icon name="add" size={24} className="font-bold" />
+            <span className="font-headline text-base sm:text-lg font-bold tracking-tight">
               Log Expense
             </span>
           </button>
@@ -555,18 +500,9 @@ export default function ExpensesTab() {
           {/* Budget Envelopes Section */}
           <div className="flex flex-col w-full gap-3">
             <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-2">
-                <h2 className="font-headline text-base sm:text-lg font-bold text-on-surface">
-                  Budget Envelopes
-                </h2>
-                <span className="px-2 py-0.5 rounded-full bg-surface-container text-xs font-bold text-on-surface-variant font-mono">
-                  {envelopes.length} Active
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-xs text-outline">
-                <span className="w-2 h-2 rounded-full bg-secondary"></span>
-                <span className="font-medium">{formattedMonth} Cycle</span>
-              </div>
+              <h2 className="font-headline text-base sm:text-lg font-bold text-on-surface">
+                Budget Envelopes
+              </h2>
             </div>
 
             {/* 8 Detailed Envelope Cards Grid */}
@@ -681,46 +617,85 @@ export default function ExpensesTab() {
                     bg: 'bg-surface-container'
                   };
 
+                  const isExpanded = expandedExpenseId === exp.id;
+
                   return (
                     <div
                       key={exp.id}
-                      className="flex items-center justify-between p-2.5 sm:p-3 rounded-2xl hover:bg-surface-container-low transition-colors border border-outline-variant/10 group"
+                      className="flex flex-col rounded-2xl border border-outline-variant/15 hover:border-outline-variant/30 bg-surface-container-low/30 transition-all overflow-hidden"
                     >
-                      <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-lg shadow-2xs", meta.bg)}>
-                          {meta.emoji}
+                      {/* Main Clickable Row */}
+                      <div
+                        onClick={() => setExpandedExpenseId(isExpanded ? null : exp.id)}
+                        className="flex items-center justify-between p-3 cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <div className={cn("w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 text-lg shadow-2xs", meta.bg)}>
+                            {meta.emoji}
+                          </div>
+                          <div className="flex flex-col min-w-0 flex-1">
+                            <span className="text-xs sm:text-sm font-semibold text-on-surface truncate">
+                              {exp.description}
+                            </span>
+                            <span className="text-[11px] text-outline truncate mt-0.5">
+                              {exp.date === today ? 'Today' : exp.date} {exp.timestamp && `· ${exp.timestamp}`} · {exp.category}
+                            </span>
+                          </div>
                         </div>
-                        <div className="flex flex-col min-w-0 flex-1">
-                          <span className="text-xs sm:text-sm font-semibold text-on-surface truncate">
-                            {exp.description}
+
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="font-mono text-xs sm:text-sm font-bold text-on-surface">
+                            -₹{Number(exp.amount).toLocaleString('en-IN')}
                           </span>
-                          <span className="text-[11px] text-outline truncate mt-0.5">
-                            {exp.date === today ? 'Today' : exp.date} {exp.timestamp && `· ${exp.timestamp}`} · {exp.paymentSource || 'HDFC Bank'}
-                          </span>
+                          <Icon 
+                            name={isExpanded ? "expand_less" : "expand_more"} 
+                            size={18} 
+                            className="text-on-surface-variant transition-transform" 
+                          />
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0 ml-2">
-                        <span className="font-mono text-xs sm:text-sm font-bold text-on-surface">
-                          -₹{Number(exp.amount).toLocaleString('en-IN')}
-                        </span>
+                      {/* Expanded Details & Actions Dropdown Drawer */}
+                      {isExpanded && (
+                        <div className="px-3 pb-3 pt-1 border-t border-outline-variant/15 bg-surface-container-low/70 flex flex-col gap-2.5 animate-fadeIn">
+                          <div className="grid grid-cols-2 gap-2 text-xs text-on-surface-variant pt-1">
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-outline block">Account / Source</span>
+                              <span className="font-medium text-on-surface">{exp.paymentSource || 'HDFC Bank'}</span>
+                            </div>
+                            <div>
+                              <span className="text-[10px] uppercase font-bold text-outline block">Date &amp; Time</span>
+                              <span className="font-medium text-on-surface">{exp.date} {exp.timestamp && `at ${exp.timestamp}`}</span>
+                            </div>
+                          </div>
 
-                        <button
-                          onClick={() => openEditExpenseModal(exp)}
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-primary transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-                          title="Edit expense"
-                        >
-                          <Icon name="edit" size={15} />
-                        </button>
+                          <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-outline-variant/10">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditExpenseModal(exp);
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-primary/10 text-primary hover:bg-primary/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Icon name="edit" size={15} />
+                              <span>Edit Expense</span>
+                            </button>
 
-                        <button
-                          onClick={() => handleDeleteExpense(exp)}
-                          className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-error transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-                          title="Delete expense"
-                        >
-                          <Icon name="delete" size={15} />
-                        </button>
-                      </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteExpense(exp);
+                              }}
+                              className="px-3.5 py-1.5 rounded-xl bg-error/10 text-error hover:bg-error/20 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                            >
+                              <Icon name="delete" size={15} />
+                              <span>Delete</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -731,15 +706,15 @@ export default function ExpensesTab() {
         </div>
       </main>
 
-      {/* Tactile iOS-Style Log Expense Modal / Bottom Sheet */}
+      {/* Clean Direct Input Log Expense Modal */}
       {showLogModal && (
-        <div className="fixed inset-0 z-50 bg-inverse-surface/40 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
-          <div className="w-full sm:max-w-md bg-surface-container-lowest rounded-t-[32px] sm:rounded-[32px] p-5 shadow-2xl border border-outline-variant/25 flex flex-col gap-3.5 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fadeIn">
+          <div className="w-full sm:max-w-md bg-surface-container-lowest rounded-t-[32px] sm:rounded-[32px] p-5 shadow-2xl border border-outline-variant/25 flex flex-col gap-4 max-h-[92vh] overflow-y-auto">
             {/* Sheet Handle */}
-            <div className="w-10 h-1 rounded-full bg-outline-variant mx-auto mb-0.5 sm:hidden"></div>
+            <div className="w-10 h-1 rounded-full bg-outline-variant mx-auto sm:hidden -mt-1"></div>
 
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between border-b border-outline-variant/15 pb-2.5">
               <h3 className="font-headline text-base sm:text-lg font-bold text-on-surface">
                 {editingExpenseId ? 'Edit Transaction' : 'Log Expense'}
               </h3>
@@ -751,100 +726,98 @@ export default function ExpensesTab() {
               </button>
             </div>
 
-            {/* Amount Display */}
-            <div className="flex flex-col items-center py-2 bg-surface-container-low rounded-2xl border border-outline-variant/15">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-outline mb-0.5">Amount</span>
-              <div className="flex items-baseline justify-center">
-                <span className="font-headline font-extrabold text-3xl sm:text-4xl text-primary">
-                  ₹{logAmount || '0'}
-                </span>
-              </div>
-            </div>
-
-            {/* Category Pills Selector */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-on-surface-variant">Category</label>
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                {DEFAULT_CATEGORY_METADATA.map((cat) => (
-                  <button
-                    key={cat.name}
-                    type="button"
-                    onClick={() => setLogCategory(cat.name)}
-                    className={cn(
-                      "flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 transition-all cursor-pointer",
-                      logCategory === cat.name
-                        ? "bg-primary text-white font-bold shadow-xs"
-                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
-                    )}
-                  >
-                    <span>{cat.emoji}</span>
-                    <span>{cat.name}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Description Input */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-on-surface-variant">Description</label>
-              <input
-                type="text"
-                value={logDescription}
-                onChange={(e) => setLogDescription(e.target.value)}
-                placeholder="e.g. Sourdough Bakery / Metro Reload"
-                className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary border border-outline-variant/15"
-              />
-            </div>
-
-            {/* Payment Source and Date */}
-            <div className="grid grid-cols-2 gap-2.5">
+            <form onSubmit={handleSaveTransaction} className="flex flex-col gap-3.5">
+              {/* Amount Input */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-on-surface-variant">Payment Source</label>
-                <select
-                  value={logPaymentSource}
-                  onChange={(e) => setLogPaymentSource(e.target.value)}
-                  className="w-full h-10 px-2.5 rounded-xl bg-surface-container-low text-on-surface text-xs font-semibold focus:outline-none border border-outline-variant/15"
-                >
-                  {PAYMENT_SOURCES.map(src => (
-                    <option key={src} value={src}>{src}</option>
-                  ))}
-                </select>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Amount</label>
+                <div className="relative flex items-center">
+                  <span className="absolute left-3.5 text-lg font-bold text-primary font-mono">₹</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    value={logAmount}
+                    onChange={(e) => setLogAmount(e.target.value)}
+                    placeholder="0"
+                    autoFocus
+                    className="w-full h-13 pl-9 pr-4 rounded-2xl bg-surface-container-low text-primary font-mono text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest border border-outline-variant/20 transition-all"
+                  />
+                </div>
               </div>
 
+              {/* Category Grid - Boxes without scrollbar! */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Category</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {DEFAULT_CATEGORY_METADATA.map((cat) => {
+                    const isSelected = logCategory === cat.name;
+                    return (
+                      <button
+                        key={cat.name}
+                        type="button"
+                        onClick={() => setLogCategory(cat.name)}
+                        className={cn(
+                          "flex flex-col items-center justify-center py-2.5 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95",
+                          isSelected
+                            ? "bg-primary text-white border-primary shadow-xs ring-2 ring-primary/20 scale-[1.02]"
+                            : "bg-surface-container-low text-on-surface-variant border-outline-variant/15 hover:border-outline-variant/35 hover:bg-surface-container"
+                        )}
+                      >
+                        <span className="text-xl mb-0.5">{cat.emoji}</span>
+                        <span className="text-[11px] truncate max-w-full">{cat.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Description Input */}
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-on-surface-variant">Date</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Description</label>
                 <input
-                  type="date"
-                  value={logDate}
-                  onChange={(e) => setLogDate(e.target.value)}
-                  className="w-full h-10 px-2.5 rounded-xl bg-surface-container-low text-on-surface text-xs font-mono focus:outline-none border border-outline-variant/15"
+                  type="text"
+                  value={logDescription}
+                  onChange={(e) => setLogDescription(e.target.value)}
+                  placeholder="e.g. Sourdough Bakery, Metro recharge"
+                  className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface placeholder:text-outline text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-surface-container-lowest border border-outline-variant/20 transition-all"
                 />
               </div>
-            </div>
 
-            {/* Tactile Keypad Grid */}
-            <div className="grid grid-cols-3 gap-1.5 pt-1">
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'backspace'].map((keyVal) => (
-                <button
-                  key={keyVal}
-                  type="button"
-                  onClick={() => handleKeypadPress(keyVal)}
-                  className="h-10 rounded-xl bg-surface-container-low hover:bg-surface-container active:bg-surface-container-high text-on-surface font-mono text-sm font-bold flex items-center justify-center transition-colors cursor-pointer"
-                >
-                  {keyVal === 'backspace' ? <Icon name="backspace" size={18} /> : keyVal}
-                </button>
-              ))}
-            </div>
+              {/* Payment Source & Date */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Payment Via</label>
+                  <select
+                    value={logPaymentSource}
+                    onChange={(e) => setLogPaymentSource(e.target.value)}
+                    className="w-full h-11 px-2.5 rounded-xl bg-surface-container-low text-on-surface text-xs font-semibold focus:outline-none border border-outline-variant/20"
+                  >
+                    {PAYMENT_SOURCES.map(src => (
+                      <option key={src} value={src}>{src}</option>
+                    ))}
+                  </select>
+                </div>
 
-            {/* Save Transaction Button */}
-            <button
-              type="button"
-              onClick={handleSaveTransaction}
-              disabled={!logAmount || Number(logAmount) <= 0 || !logDescription.trim() || isSaving}
-              className="w-full h-12 mt-1 rounded-2xl bg-primary text-white font-headline font-bold text-sm flex items-center justify-center shadow-md active:scale-[0.98] transition-transform disabled:opacity-40 cursor-pointer"
-            >
-              {isSaving ? 'Saving...' : editingExpenseId ? 'Update Transaction' : 'Save Transaction'}
-            </button>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-outline">Date</label>
+                  <input
+                    type="date"
+                    value={logDate}
+                    onChange={(e) => setLogDate(e.target.value)}
+                    className="w-full h-11 px-2.5 rounded-xl bg-surface-container-low text-on-surface text-xs font-mono focus:outline-none border border-outline-variant/20"
+                  />
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button
+                type="submit"
+                disabled={!logAmount || Number(logAmount) <= 0 || !logDescription.trim() || isSaving}
+                className="w-full h-12 mt-1 rounded-2xl bg-primary hover:bg-primary/90 text-white font-headline font-bold text-xs sm:text-sm flex items-center justify-center shadow-md active:scale-[0.98] transition-all disabled:opacity-40 cursor-pointer"
+              >
+                {isSaving ? 'Saving...' : editingExpenseId ? 'Update Expense' : 'Save Expense'}
+              </button>
+            </form>
           </div>
         </div>
       )}

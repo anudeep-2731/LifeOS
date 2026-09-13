@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import Icon from '../components/ui/Icon';
 import QuickLoggerBar from '../components/ui/QuickLoggerBar';
 import { db, getTodayStr, getMonthStr, seedTodayData, computeStreak } from '../db/database';
@@ -78,6 +79,11 @@ export default function DashboardTab() {
 
   // Completed Accordion
   const [completedAccordionOpen, setCompletedAccordionOpen] = useState(false);
+  const [showCompletedHabits, setShowCompletedHabits] = useState(false);
+
+  // Active vs Completed Habits
+  const activeRoutines = useMemo(() => routines.filter(r => !r.completed), [routines]);
+  const completedRoutines = useMemo(() => routines.filter(r => r.completed), [routines]);
 
   // Formatted Date
   const dateStr = useMemo(() => {
@@ -269,11 +275,11 @@ export default function DashboardTab() {
           <section className="flex flex-col gap-3 pt-2">
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col min-w-0">
-                <span className="text-xs font-semibold text-on-surface-variant tracking-wider uppercase">
+                <span className="text-[11px] font-semibold text-on-surface-variant tracking-wider uppercase">
                   {dateStr}
                 </span>
-                <h2 className="text-2xl sm:text-3xl font-headline font-bold text-on-surface tracking-tight mt-0.5 truncate">
-                  {getGreeting()}, {userName}
+                <h2 className="text-xl sm:text-2xl font-headline font-extrabold text-on-surface tracking-tight mt-0.5">
+                  Hey, {userName || 'Anudeep'} 👋
                 </h2>
               </div>
 
@@ -301,7 +307,7 @@ export default function DashboardTab() {
                     isOnTrack ? "bg-secondary animate-pulse" : "bg-error animate-pulse"
                   )}></span>
                   <span className="text-[11px] font-bold text-on-surface-variant uppercase tracking-wider">
-                    Monthly Cashflow &amp; Daily Budget
+                    Budget Snapshot
                   </span>
                 </div>
 
@@ -323,7 +329,7 @@ export default function DashboardTab() {
                 {/* 1. Total Spent This Month */}
                 <div className="flex flex-col items-center px-1">
                   <span className="text-[10px] uppercase tracking-wider text-outline font-bold truncate max-w-full">
-                    SPENT THIS MONTH
+                    SPENT
                   </span>
                   <span className="font-mono text-xs sm:text-sm font-bold text-on-surface mt-0.5">
                     {formatINR(monthSpent)}
@@ -349,7 +355,7 @@ export default function DashboardTab() {
                 {/* 3. Today's Budget */}
                 <div className="flex flex-col items-center px-1">
                   <span className="text-[10px] uppercase tracking-wider text-outline font-bold truncate max-w-full">
-                    TODAY'S BUDGET
+                    TODAY LIMIT
                   </span>
                   <span className="font-mono text-xs sm:text-sm font-bold text-primary mt-0.5">
                     {formatINR(safeToSpendToday)}
@@ -435,7 +441,7 @@ export default function DashboardTab() {
               </button>
             </div>
 
-            {/* Habit Cards Carousel / Responsive Grid */}
+            {/* Habit Cards Responsive Grid */}
             {routines.length === 0 ? (
               <div className="p-6 bg-surface-container-lowest rounded-3xl border border-outline-variant/25 text-center flex flex-col items-center justify-center gap-2">
                 <span className="text-3xl">🌱</span>
@@ -451,51 +457,118 @@ export default function DashboardTab() {
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {routines.map((habit) => {
-                  const isDone = habit.completed;
-                  const emoji = getHabitEmoji(habit.title, habit.type || habit.category);
+              <div className="flex flex-col gap-2.5">
+                {/* Active Habits Grid */}
+                {activeRoutines.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    <AnimatePresence>
+                      {activeRoutines.map((habit) => {
+                        const emoji = getHabitEmoji(habit.title, habit.type || habit.category);
 
-                  return (
+                        return (
+                          <motion.div
+                            key={habit.id}
+                            layout
+                            initial={{ opacity: 0, scale: 0.9 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8, y: -12 }}
+                            transition={{ duration: 0.25 }}
+                          >
+                            <button
+                              onClick={() => handleToggleHabit(habit)}
+                              className="w-full text-left p-3.5 rounded-2xl bg-surface-container-lowest border border-outline-variant/25 hover:border-primary/40 hover:bg-surface-container-low/50 shadow-xs flex flex-col justify-between h-28 transition-all active:scale-[0.98] select-none group cursor-pointer"
+                            >
+                              <div className="flex items-start justify-between w-full">
+                                <span className="text-2xl">{emoji}</span>
+                                <div className="w-6 h-6 rounded-full bg-surface-container-highest flex items-center justify-center group-hover:bg-primary/20 transition-colors shadow-2xs">
+                                  <Icon name="check" size={16} className="opacity-0 group-hover:opacity-60 text-primary" />
+                                </div>
+                              </div>
+
+                              <div className="min-w-0 w-full">
+                                <p className="text-xs sm:text-sm font-semibold truncate text-on-surface">
+                                  {habit.title}
+                                </p>
+                                <span className="text-[11px] font-medium tracking-tight block truncate mt-0.5 text-on-surface-variant">
+                                  {habit.start ? `Target: ${habit.start}` : `${habit.duration || 15} mins`}
+                                </span>
+                              </div>
+                            </button>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                ) : (
+                  <div className="p-4 sm:p-5 bg-secondary/10 border border-secondary/20 rounded-2xl flex items-center gap-3 animate-fadeIn">
+                    <span className="text-2xl">🎉</span>
+                    <div>
+                      <p className="font-headline font-bold text-xs sm:text-sm text-on-surface">
+                        All Habits Conquered Today!
+                      </p>
+                      <p className="text-[11px] text-on-surface-variant mt-0.5">
+                        Fantastic discipline. You have completed all scheduled daily habits.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Collapsible Completed Habits Dropdown */}
+                {completedRoutines.length > 0 && (
+                  <div className="flex flex-col gap-2 pt-1">
                     <button
-                      key={habit.id}
-                      onClick={() => handleToggleHabit(habit)}
-                      className={cn(
-                        "text-left p-3.5 rounded-2xl bg-surface-container-lowest border shadow-xs flex flex-col justify-between h-28 transition-all active:scale-[0.98] select-none group",
-                        isDone 
-                          ? "border-secondary/20 bg-secondary/5" 
-                          : "border-outline-variant/25 hover:border-primary/40 hover:bg-surface-container-low/50"
-                      )}
+                      type="button"
+                      onClick={() => setShowCompletedHabits(!showCompletedHabits)}
+                      className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-surface-container-low hover:bg-surface-container text-xs font-semibold text-on-surface-variant transition-colors cursor-pointer border border-outline-variant/15"
                     >
-                      <div className="flex items-start justify-between w-full">
-                        <span className="text-2xl">{emoji}</span>
-                        <div className={cn(
-                          "w-6 h-6 rounded-full flex items-center justify-center transition-colors shadow-2xs",
-                          isDone 
-                            ? "bg-secondary-container text-on-secondary-container" 
-                            : "bg-surface-container-highest text-transparent group-hover:text-outline-variant"
-                        )}>
-                          <Icon name="check" size={16} className={isDone ? "text-on-secondary-container font-bold" : "opacity-0 group-hover:opacity-60"} />
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <Icon name="task_alt" size={16} className="text-secondary" />
+                        <span>Completed Habits ({completedRoutines.length})</span>
                       </div>
-
-                      <div className="min-w-0 w-full">
-                        <p className={cn(
-                          "text-xs sm:text-sm font-semibold truncate transition-all",
-                          isDone ? "text-on-surface/70 line-through" : "text-on-surface"
-                        )}>
-                          {habit.title}
-                        </p>
-                        <span className={cn(
-                          "text-[11px] font-medium tracking-tight block truncate mt-0.5",
-                          isDone ? "text-secondary font-semibold" : "text-on-surface-variant"
-                        )}>
-                          {isDone ? 'Completed' : (habit.start ? `Target: ${habit.start}` : `${habit.duration || 15} mins`)}
-                        </span>
-                      </div>
+                      <Icon name={showCompletedHabits ? "expand_less" : "expand_more"} size={18} />
                     </button>
-                  );
-                })}
+
+                    <AnimatePresence>
+                      {showCompletedHabits && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 overflow-hidden"
+                        >
+                          {completedRoutines.map((habit) => {
+                            const emoji = getHabitEmoji(habit.title, habit.type || habit.category);
+
+                            return (
+                              <button
+                                key={habit.id}
+                                onClick={() => handleToggleHabit(habit)}
+                                className="text-left p-3 rounded-2xl bg-secondary/5 border border-secondary/20 shadow-xs flex flex-col justify-between h-24 transition-all active:scale-[0.98] select-none group cursor-pointer"
+                                title="Tap to mark incomplete"
+                              >
+                                <div className="flex items-start justify-between w-full">
+                                  <span className="text-xl opacity-75">{emoji}</span>
+                                  <div className="w-5 h-5 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
+                                    <Icon name="check" size={14} className="text-on-secondary-container font-bold" />
+                                  </div>
+                                </div>
+
+                                <div className="min-w-0 w-full">
+                                  <p className="text-xs font-semibold truncate text-on-surface/70 line-through">
+                                    {habit.title}
+                                  </p>
+                                  <span className="text-[10px] text-secondary font-semibold block truncate mt-0.5">
+                                    Completed ✓
+                                  </span>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                )}
               </div>
             )}
           </section>
