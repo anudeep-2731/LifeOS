@@ -972,9 +972,15 @@ export const fetchCircleMembers = async (circleId) => {
   return data || [];
 };
 
-export const fetchCircleDailySnapshots = async (dateStr) => {
+export const fetchCircleDailySnapshots = async (circleIdOrDate, maybeDate) => {
   const client = await getSupabase();
   if (!client) return [];
+  
+  const dateStr = (maybeDate && typeof maybeDate === 'string' && maybeDate.includes('-'))
+    ? maybeDate
+    : (circleIdOrDate && typeof circleIdOrDate === 'string' && circleIdOrDate.includes('-') && circleIdOrDate.length === 10)
+      ? circleIdOrDate
+      : new Date().toISOString().split('T')[0];
   
   const { data, error } = await client
     .from('circle_daily_snapshots')

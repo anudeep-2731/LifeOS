@@ -7,7 +7,7 @@ import CircleSettingsSheet from '../components/circles/CircleSettingsSheet';
 import SquadScorecardsModal from '../components/circles/SquadScorecardsModal';
 import PostComposer from '../components/circles/PostComposer';
 import CirclePostCard from '../components/circles/CirclePostCard';
-import MemberScoreCard from '../components/circles/MemberScoreCard';
+import MemberScorecardModal from '../components/circles/MemberScorecardModal';
 import {
   fetchMyCircles,
   fetchCircleMembers,
@@ -79,8 +79,15 @@ export default function CirclesTab() {
           fetchCirclePosts(active.id),
         ]);
 
+        const snapsMap = {};
+        if (Array.isArray(snaps)) {
+          snaps.forEach(s => {
+            if (s.user_id) snapsMap[s.user_id] = s;
+          });
+        }
+
         setMembers(mList || []);
-        setSnapshots(snaps || {});
+        setSnapshots(snapsMap);
         setPosts(pList || []);
       }
     } catch (err) {
@@ -115,8 +122,14 @@ export default function CirclesTab() {
         fetchCircleDailySnapshots(circle.id, todayStr),
         fetchCirclePosts(circle.id),
       ]);
+      const snapsMap = {};
+      if (Array.isArray(snaps)) {
+        snaps.forEach(s => {
+          if (s.user_id) snapsMap[s.user_id] = s;
+        });
+      }
       setMembers(mList || []);
-      setSnapshots(snaps || {});
+      setSnapshots(snapsMap);
       setPosts(pList || []);
     } catch (err) {
       console.error(err);
@@ -509,9 +522,13 @@ export default function CirclesTab() {
       />
 
       {selectedMember && (
-        <MemberScoreCard
-          member={selectedMember}
+        <MemberScorecardModal
+          isOpen={!!selectedMember}
           onClose={() => setSelectedMember(null)}
+          member={selectedMember}
+          snapshot={snapshots[selectedMember.user_id]}
+          isCurrentUser={selectedMember.user_id === currentUserId}
+          circleName={selectedCircle?.name || 'Squad'}
         />
       )}
     </div>
