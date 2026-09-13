@@ -5,6 +5,7 @@ import { db, getTodayStr } from '../db/database';
 import { 
   fetchCloudSchedule, 
   addCloudScheduleItem, 
+  updateCloudScheduleItem,
   deleteCloudScheduleItem,
   fetchCloudMasterRoutines,
   saveCloudMasterRoutines
@@ -30,6 +31,20 @@ export default function StudioTab() {
   const [newDuration, setNewDuration] = useState(15);
   const [newCategory, setNewCategory] = useState('Health');
   const [newRecurrence, setNewRecurrence] = useState('Daily');
+
+  // New Planned Task form state
+  const [showAddTaskForm, setShowAddTaskForm] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState(today);
+  const [taskScheduledTime, setTaskScheduledTime] = useState('09:00 AM');
+  const [taskPriority, setTaskPriority] = useState('High');
+  const [taskCategory, setTaskCategory] = useState('Work');
+  const [taskNotes, setTaskNotes] = useState('');
+
+  // Sync taskDueDate with selectedDate
+  useEffect(() => {
+    setTaskDueDate(selectedDate);
+  }, [selectedDate]);
 
   // Generate 7-day strip centered around current date
   useEffect(() => {
@@ -221,6 +236,57 @@ export default function StudioTab() {
       setTimeout(() => setActionSuccess(null), 2500);
     } catch (err) {
       console.error('Error deleting habit:', err);
+    }
+  };
+
+  // Add Planned Task
+  const handleSavePlannedTask = async () => {
+    if (!taskTitle.trim()) return;
+
+    try {
+      await addCloudScheduleItem({
+        itemType: 'task',
+        title: taskTitle.trim(),
+        date: selectedDate,
+        dueDate: taskDueDate || selectedDate,
+        scheduledTime: taskScheduledTime || '09:00 AM',
+        priority: taskPriority,
+        category: taskCategory,
+        notes: taskNotes || '',
+        duration: 25,
+        completed: false
+      });
+
+      setTaskTitle('');
+      setTaskNotes('');
+      setShowAddTaskForm(false);
+      setActionSuccess(`Added task for ${selectedDate}!`);
+      setTimeout(() => setActionSuccess(null), 3000);
+      await loadStudioData();
+    } catch (err) {
+      console.error('Error adding task in studio:', err);
+    }
+  };
+
+  // Toggle Task Completion
+  const handleToggleTask = async (task) => {
+    try {
+      await updateCloudScheduleItem(task.id, { ...task, completed: !task.completed });
+      await loadStudioData();
+    } catch (err) {
+      console.error('Error toggling task:', err);
+    }
+  };
+
+  // Delete Planned Task
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await deleteCloudScheduleItem(taskId);
+      setActionSuccess('Task removed');
+      setTimeout(() => setActionSuccess(null), 2500);
+      await loadStudioData();
+    } catch (err) {
+      console.error('Error deleting task:', err);
     }
   };
 
@@ -556,6 +622,240 @@ export default function StudioTab() {
                           title="Delete blueprint"
                         >
                           <Icon name="delete" size={18} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </section>
+
+          {/* Planned Tasks for Selected Date Section */}
+          <section className="flex flex-col gap-3 mb-4">
+            <div className="flex items-center justify-between px-1">
+              <div className="flex items-center gap-2">
+                <h3 className="font-headline text-base sm:text-lg font-bold text-on-surface">
+                  Planned Tasks
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-primary-fixed/40 text-primary font-mono text-xs font-bold">
+                  {selectedDate === today ? 'Today' : selectedDate} · {daySchedule.tasks.length}
+                </span>
+              </div>
+
+              <button
+                onClick={() => setShowAddTaskForm(!showAddTaskForm)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-primary text-white font-bold text-xs active:scale-95 transition-all shadow-xs cursor-pointer"
+              >
+                <Icon name={showAddTaskForm ? 'close' : 'add'} size={18} />
+                <span>{showAddTaskForm ? 'Cancel' : 'Add Task'}</span>
+              </button>
+            </div>
+
+            {/* Expandable Add Task Form */}
+            {showAddTaskForm && (
+              <div className="bg-surface-container-lowest rounded-3xl p-4 sm:p-5 shadow-card border border-outline-variant/25 transition-all duration-300">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="font-headline text-sm sm:text-base font-bold text-on-surface">
+                    Plan Task for {selectedDate}
+                  </span>
+                  <button
+                    onClick={() => setShowAddTaskForm(false)}
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-low transition-colors"
+                  >
+                    <Icon name="close" size={18} />
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-3 mb-3">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">
+                      Task Title
+                    </label>
+                    <input
+                      type="text"
+                      value={taskTitle}
+                      onChange={(e) => setTaskTitle(e.target.value)}
+                      placeholder="e.g. Complete quarterly financial review"
+                      className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface placeholder:text-outline-variant text-xs sm:text-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container border border-outline-variant/15"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-on-surface-variant">
+                        Due Date
+                      </label>
+                      <input
+                        type="date"
+                        value={taskDueDate}
+                        onChange={(e) => setTaskDueDate(e.target.value)}
+                        className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-mono text-xs sm:text-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container border border-outline-variant/15"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-semibold text-on-surface-variant">
+                        Scheduled Time
+                      </label>
+                      <input
+                        type="text"
+                        value={taskScheduledTime}
+                        onChange={(e) => setTaskScheduledTime(e.target.value)}
+                        placeholder="09:00 AM"
+                        className="w-full h-11 px-3.5 rounded-xl bg-surface-container-low text-on-surface font-mono text-xs sm:text-sm focus:outline-none focus:bg-surface-container-lowest focus:ring-2 focus:ring-primary-container border border-outline-variant/15"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Priority and Category */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-on-surface-variant">Priority</label>
+                      <div className="flex gap-2">
+                        {['High', 'Medium', 'Low'].map((p) => (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setTaskPriority(p)}
+                            className={cn(
+                              "flex-1 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer",
+                              taskPriority === p
+                                ? p === 'High' ? 'bg-error text-white font-bold' : p === 'Medium' ? 'bg-tertiary-container text-white font-bold' : 'bg-secondary text-white font-bold'
+                                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container'
+                            )}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-on-surface-variant">Category</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {['Work', 'Personal', 'Finance', 'Health', 'Deep Work', 'Inbox'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setTaskCategory(c)}
+                            className={cn(
+                              "px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer",
+                              taskCategory === c
+                                ? "bg-primary text-white font-bold shadow-xs"
+                                : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container"
+                            )}
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-semibold text-on-surface-variant">Notes / Context</label>
+                    <input
+                      type="text"
+                      value={taskNotes}
+                      onChange={(e) => setTaskNotes(e.target.value)}
+                      placeholder="Optional notes..."
+                      className="w-full h-10 px-3.5 rounded-xl bg-surface-container-low text-on-surface placeholder:text-outline-variant text-xs focus:outline-none border border-outline-variant/15"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddTaskForm(false)}
+                    className="px-4 py-2 rounded-full text-on-surface-variant hover:bg-surface-container-low text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSavePlannedTask}
+                    disabled={!taskTitle.trim()}
+                    className="px-5 py-2 rounded-full bg-primary text-white text-xs font-bold active:scale-95 transition-all shadow-xs disabled:opacity-40 cursor-pointer"
+                  >
+                    Add to Plan
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* List of Tasks for Selected Date */}
+            <div className="space-y-2">
+              {daySchedule.tasks.length === 0 ? (
+                <div className="p-6 bg-surface-container-lowest rounded-2xl border border-outline-variant/20 text-center space-y-1">
+                  <p className="font-headline font-bold text-xs text-on-surface-variant">
+                    No tasks scheduled for {selectedDate}
+                  </p>
+                  <p className="text-[11px] text-outline">
+                    Click "Add Task" above to plan a task for this date.
+                  </p>
+                </div>
+              ) : (
+                daySchedule.tasks.map((task) => {
+                  const isDone = task.completed;
+                  const priority = (task.priority || 'Medium').toLowerCase();
+                  const dotColor = priority === 'high' ? 'bg-error' : priority === 'medium' || priority === 'med' ? 'bg-tertiary-container' : 'bg-secondary';
+
+                  return (
+                    <div
+                      key={task.id}
+                      className={cn(
+                        "flex items-center justify-between p-3.5 bg-surface-container-lowest rounded-2xl shadow-xs border transition-all group",
+                        isDone ? "border-secondary/20 bg-secondary/5" : "border-outline-variant/20 hover:border-outline-variant/40"
+                      )}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <button
+                          onClick={() => handleToggleTask(task)}
+                          className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all cursor-pointer",
+                            isDone ? "bg-secondary-container text-on-secondary-container" : "bg-surface-container-highest text-transparent group-hover:text-outline-variant"
+                          )}
+                        >
+                          <Icon name="check" size={16} className={isDone ? "font-bold" : "opacity-0 group-hover:opacity-70"} />
+                        </button>
+
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <span className={cn(
+                            "text-xs sm:text-sm font-semibold truncate",
+                            isDone ? "text-on-surface-variant line-through" : "text-on-surface"
+                          )}>
+                            {task.title}
+                          </span>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="font-mono text-[11px] text-on-surface-variant flex items-center gap-1">
+                              <Icon name="schedule" size={12} />
+                              {task.scheduledTime || task.time || 'Today'}
+                            </span>
+                            {task.dueDate && (
+                              <>
+                                <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+                                <span className="font-mono text-[10px] text-outline">
+                                  Due: {task.dueDate}
+                                </span>
+                              </>
+                            )}
+                            <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
+                            <span className="px-2 py-0.5 rounded-md bg-surface-container text-[10px] font-semibold text-on-surface-variant">
+                              {task.category || 'Work'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0 ml-2">
+                        <span className={cn("w-2.5 h-2.5 rounded-full shrink-0", dotColor)} title={`${task.priority || 'Medium'} Priority`} />
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center text-outline hover:text-error hover:bg-error-container/20 transition-colors cursor-pointer"
+                          title="Delete task"
+                        >
+                          <Icon name="delete" size={16} />
                         </button>
                       </div>
                     </div>

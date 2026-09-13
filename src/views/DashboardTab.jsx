@@ -71,6 +71,10 @@ export default function DashboardTab() {
   // Quick Task Add State
   const [newTaskInput, setNewTaskInput] = useState('');
   const [selectedPriority, setSelectedPriority] = useState('high'); // 'high' | 'med' | 'low'
+  const [taskDueDate, setTaskDueDate] = useState(today);
+  const [taskTime, setTaskTime] = useState('Today');
+  const [taskCategory, setTaskCategory] = useState('Work');
+  const [showTaskDetails, setShowTaskDetails] = useState(false);
   const [isSubmittingTask, setIsSubmittingTask] = useState(false);
 
   // Completed Accordion
@@ -242,10 +246,10 @@ export default function DashboardTab() {
         itemType: 'task',
         title,
         date: today,
-        dueDate: today,
-        scheduledTime: 'Today',
+        dueDate: taskDueDate || today,
+        scheduledTime: taskTime || 'Today',
         duration: 20,
-        category: 'Inbox',
+        category: taskCategory || 'Inbox',
         priority: priorityLabel,
         completed: false
       });
@@ -256,6 +260,7 @@ export default function DashboardTab() {
         await loadCockpitData();
       }
       setNewTaskInput('');
+      setShowTaskDetails(false);
     } catch (err) {
       console.error('Error adding task:', err);
     } finally {
@@ -509,14 +514,14 @@ export default function DashboardTab() {
                 />
               </div>
 
-              {/* Priority Chip Selector & Add Button */}
+              {/* Priority Chip Selector & Options & Add Button */}
               <div className="flex items-center justify-between pt-1 px-1 border-t border-outline-variant/15">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setSelectedPriority('high')}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer",
                       selectedPriority === 'high'
                         ? "bg-error-container/60 text-on-error-container shadow-2xs font-bold"
                         : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
@@ -528,7 +533,7 @@ export default function DashboardTab() {
                     type="button"
                     onClick={() => setSelectedPriority('med')}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer",
                       selectedPriority === 'med'
                         ? "bg-tertiary-fixed/80 text-on-tertiary-fixed-variant shadow-2xs font-bold"
                         : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
@@ -540,7 +545,7 @@ export default function DashboardTab() {
                     type="button"
                     onClick={() => setSelectedPriority('low')}
                     className={cn(
-                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all",
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer",
                       selectedPriority === 'low'
                         ? "bg-secondary-container/60 text-on-secondary-container shadow-2xs font-bold"
                         : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
@@ -548,16 +553,79 @@ export default function DashboardTab() {
                   >
                     Low
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowTaskDetails(!showTaskDetails)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-full text-xs font-semibold transition-all flex items-center gap-1 cursor-pointer",
+                      showTaskDetails 
+                        ? "bg-primary text-white font-bold" 
+                        : "bg-surface-container text-on-surface-variant hover:bg-surface-container-high"
+                    )}
+                    title="Due Date & Category Options"
+                  >
+                    <Icon name="event" size={14} />
+                    <span>Options</span>
+                  </button>
                 </div>
 
                 <button
                   type="submit"
                   disabled={!newTaskInput.trim() || isSubmittingTask}
-                  className="px-4 py-1.5 rounded-full bg-primary-container text-on-primary-container text-xs font-bold hover:opacity-95 active:scale-95 transition-all disabled:opacity-40 shadow-xs"
+                  className="px-4 py-1.5 rounded-full bg-primary-container text-on-primary-container text-xs font-bold hover:opacity-95 active:scale-95 transition-all disabled:opacity-40 shadow-xs cursor-pointer"
                 >
                   {isSubmittingTask ? 'Adding...' : 'Add'}
                 </button>
               </div>
+
+              {/* Expandable Task Template Details (Due Date, Time, Category) */}
+              {showTaskDetails && (
+                <div className="pt-2 px-1 border-t border-outline-variant/15 flex flex-col gap-2.5 bg-surface-container-low/50 p-2.5 rounded-xl">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-outline block mb-1">Due Date</label>
+                      <input
+                        type="date"
+                        value={taskDueDate}
+                        onChange={(e) => setTaskDueDate(e.target.value)}
+                        className="w-full h-8 px-2.5 rounded-lg bg-surface-container-lowest text-on-surface text-xs font-mono border border-outline-variant/20 focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-outline block mb-1">Scheduled Time</label>
+                      <input
+                        type="text"
+                        value={taskTime}
+                        onChange={(e) => setTaskTime(e.target.value)}
+                        placeholder="02:00 PM"
+                        className="w-full h-8 px-2.5 rounded-lg bg-surface-container-lowest text-on-surface text-xs font-mono border border-outline-variant/20 focus:outline-none focus:ring-1 focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-wider text-outline block mb-1">Category</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {['Work', 'Personal', 'Finance', 'Health', 'Deep Work', 'Inbox'].map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setTaskCategory(cat)}
+                          className={cn(
+                            "px-2.5 py-0.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer",
+                            taskCategory === cat
+                              ? "bg-primary text-white font-bold"
+                              : "bg-surface-container-lowest text-on-surface-variant hover:bg-surface-container"
+                          )}
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </form>
 
             {/* Active Priority Tasks List */}
