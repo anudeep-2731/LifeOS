@@ -1125,13 +1125,11 @@ export const createCirclePost = async ({ circleId, photoUrl, caption, postType =
   if (!session?.user) throw new Error('User not authenticated');
   
   const userName = await fetchUserProfileName();
-  const userAvatar = await fetchUserProfileAvatar();
   
   const payload = {
     circle_id: circleId,
     user_id: session.user.id,
-    user_name: userName,
-    user_avatar: userAvatar || null,
+    user_name: userName || 'Member',
     photo_url: photoUrl || null,
     caption: caption || '',
     post_type: postType
@@ -1159,7 +1157,7 @@ export const fetchCirclePosts = async (circleId) => {
       .order('created_at', { ascending: false }),
     client
       .from('circle_members')
-      .select('user_id, user_name, display_name, avatar_url')
+      .select('*')
       .eq('circle_id', circleId)
   ]);
     
